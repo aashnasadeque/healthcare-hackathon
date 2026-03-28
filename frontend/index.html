@@ -2,1587 +2,577 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="theme-color" content="#FAF8F5" />
-  <title>BC Care Navigator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patient Risk Dashboard</title>
   <style>
-    /* ── CSS Custom Properties ── */
     :root {
-      --bg:              #FAF8F5;
-      --bg-alt:          #F5F0E8;
-      --surface:         #FFFFFF;
-      --border:          #E8E0D5;
-      --border-light:    #F0EAE0;
-      --text:            #2C2C2C;
-      --text-muted:      #6B6B6B;
-      --accent:          #8B7355;
-      --accent-dark:     #705C42;
-      --accent-light:    #F5EEE4;
-      --red:             #DC2626;
-      --red-light:       #FEF2F2;
-      --green:           #4A7C59;
-      --green-light:     #F0F7F2;
-      --purple-gray:     #6B7A9A;
-      --purple-gray-light:#F3F4F8;
-      --font:            system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --transition:      0.22s ease;
+      --bg: #F7F5F2;
+      --surface: #FFFFFF;
+      --border: #E4DDD5;
+      --text: #1A1A1A;
+      --text-muted: #6B6B6B;
+      --accent: #2C5282;
+      --accent-light: #EBF4FF;
+      --red: #C53030;
+      --red-bg: #FFF5F5;
+      --red-border: #FEB2B2;
+      --orange: #C05621;
+      --orange-bg: #FFFAF0;
+      --orange-border: #FBD38D;
+      --green: #276749;
+      --green-bg: #F0FFF4;
+      --green-border: #9AE6B4;
+      --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
-
-    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.6;
+      font-size: 14px;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      min-height: -webkit-fill-available;
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    /* ── Skip link ── */
-    .skip-link {
-      position: absolute;
-      top: -40px;
-      left: 0;
-      background: var(--accent);
-      color: #fff;
-      padding: 8px 16px;
-      font-size: 14px;
-      font-weight: 600;
-      text-decoration: none;
-      border-radius: 0 0 8px 0;
-      z-index: 9999;
-      transition: top 0.2s;
-    }
-    .skip-link:focus { top: 0; }
-
-    /* ── App shell ── */
-    #app {
-      width: 100%;
-      max-width: 480px;
-      min-height: 100vh;
-      min-height: -webkit-fill-available;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      background: var(--bg);
       overflow: hidden;
     }
 
-    /* ── Progress indicator ── */
-    .progress-bar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 16px 24px 12px;
-      flex-shrink: 0;
-    }
-    .progress-step {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .progress-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--border);
-      transition: background var(--transition), transform var(--transition);
-    }
-    .progress-dot.active {
-      background: var(--accent);
-      transform: scale(1.3);
-    }
-    .progress-dot.done {
-      background: var(--accent);
-      opacity: 0.45;
-    }
-    .progress-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      letter-spacing: 0.04em;
-    }
-
-    /* ── Screen base ── */
-    .screen {
-      display: none;
-      flex-direction: column;
-      width: 100%;
-      min-height: 100vh;
-      min-height: -webkit-fill-available;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity var(--transition), transform var(--transition);
-    }
-    .screen.active {
-      display: flex;
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ── Buttons ── */
-    .btn {
-      display: block;
-      width: 100%;
-      min-height: 52px;
-      padding: 14px 20px;
-      border: none;
-      border-radius: 10px;
-      font-family: var(--font);
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      text-align: center;
-      text-decoration: none;
-      line-height: 1.4;
-      transition: opacity 0.15s, transform 0.1s, background 0.15s;
-      -webkit-appearance: none;
-    }
-    .btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-    .btn:active { opacity: 0.82; transform: scale(0.985); }
-
-    .btn-red {
-      background: var(--red);
-      color: #fff;
-    }
-    .btn-red:hover { opacity: 0.9; }
-
-    .btn-accent {
+    /* ── Header ── */
+    header {
       background: var(--accent);
       color: #fff;
-    }
-    .btn-accent:hover { background: var(--accent-dark); }
-
-    .btn-outline {
-      background: transparent;
-      color: var(--accent);
-      border: 1.5px solid var(--accent);
-    }
-    .btn-outline:hover { background: var(--accent-light); }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--text-muted);
-      font-weight: 400;
-      font-size: 15px;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      border-radius: 8px;
-    }
-    .btn-ghost:hover { color: var(--text); }
-
-    .btn-subtle {
-      background: var(--bg-alt);
-      color: var(--text);
-      font-weight: 500;
-      border: 1px solid var(--border);
-    }
-    .btn-subtle:hover { background: var(--border); }
-
-
-    /* ══════════════════════════════════════
-       SCREEN 0 — EMERGENCY
-    ══════════════════════════════════════ */
-    #screen-emergency {
-      background: var(--bg);
-    }
-    .emergency-top-bar {
-      height: 4px;
-      background: var(--red);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       flex-shrink: 0;
+      gap: 12px;
     }
-    .emergency-card {
-      margin: 32px 20px 0;
+    header h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.01em; }
+    header p { font-size: 12px; opacity: 0.75; margin-top: 1px; }
+    .header-stats { display: flex; gap: 16px; font-size: 12px; opacity: 0.9; flex-shrink: 0; }
+    .header-stat { text-align: center; }
+    .header-stat strong { display: block; font-size: 18px; font-weight: 700; }
+
+    /* ── Main layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Patient list panel ── */
+    .patient-list-panel {
+      width: 300px;
+      flex-shrink: 0;
       background: var(--surface);
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--red);
-      padding: 28px 24px 24px;
-    }
-    .emergency-card h1 {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.4;
-      margin-bottom: 20px;
-      text-wrap: balance;
-    }
-    .emergency-list {
-      list-style: none;
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      gap: 0;
-    }
-    .emergency-list li {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border-light);
-      font-size: 15px;
-      line-height: 1.55;
-      color: var(--text);
-    }
-    .emergency-list li:last-child { border-bottom: none; }
-
-    .emergency-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 24px 20px 36px;
+      overflow: hidden;
     }
 
-
-    /* ══════════════════════════════════════
-       SCREEN 1 — CHAT
-    ══════════════════════════════════════ */
-    #screen-chat {
-      height: 100vh;
-      height: -webkit-fill-available;
-      background: var(--bg);
-    }
-
-    .chat-header {
-      background: var(--surface);
+    .list-header {
+      padding: 12px;
       border-bottom: 1px solid var(--border);
-      padding: 20px 20px 16px;
       flex-shrink: 0;
     }
-    .chat-header-inner {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      margin-bottom: 2px;
-    }
-    .chat-header h1 {
-      font-size: 17px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .chat-guide-label {
-      font-size: 13px;
-      color: var(--accent);
-      font-weight: 600;
-      background: var(--accent-light);
-      padding: 2px 8px;
-      border-radius: 20px;
-    }
-    .chat-header-sub {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
 
-    .chat-messages {
+    .search-box {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+    }
+    .search-box:focus { border-color: var(--accent); }
+
+    .list-filters {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .filter-btn {
+      flex: 1;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .filter-btn.active-filter { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .filter-btn:hover:not(.active-filter) { background: var(--border); }
+
+    .patient-list {
       flex: 1;
       overflow-y: auto;
-      padding: 20px 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: var(--bg);
-      -webkit-overflow-scrolling: touch;
-      scroll-margin-top: 8px;
     }
 
-    .bubble-wrap {
-      display: flex;
-      flex-direction: column;
-      max-width: 84%;
-    }
-    .bubble-wrap.user {
-      align-self: flex-end;
-      align-items: flex-end;
-    }
-    .bubble-wrap.claude {
-      align-self: flex-start;
-      align-items: flex-start;
-    }
-    .bubble-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-      padding: 0 4px;
-      font-weight: 500;
-      letter-spacing: 0.02em;
-    }
-    .bubble {
-      padding: 12px 16px;
-      border-radius: 16px;
-      font-size: 15px;
-      line-height: 1.55;
-      word-break: break-word;
-    }
-    .bubble-wrap.user .bubble {
-      background: var(--accent);
-      color: #fff;
-      border-bottom-right-radius: 4px;
-    }
-    .bubble-wrap.claude .bubble {
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-bottom-left-radius: 4px;
-    }
-
-    .typing-bubble {
-      padding: 14px 18px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      border-bottom-left-radius: 4px;
-      font-size: 15px;
-      color: var(--text-muted);
-      letter-spacing: 0.08em;
-    }
-
-    .chat-error-bubble {
-      background: var(--red-light);
-      border: 1px solid #FECACA;
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 14px;
-      color: #991B1B;
-      line-height: 1.55;
-    }
-
-    .chat-input-area {
-      flex-shrink: 0;
-      display: flex;
-      align-items: flex-end;
-      gap: 10px;
-      padding: 10px 14px 18px;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-    }
-    .chat-input {
-      flex: 1;
-      min-height: 48px;
-      max-height: 120px;
-      resize: none;
-      border: 1.5px solid var(--border);
-      border-radius: 24px;
-      padding: 12px 16px;
-      font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.4;
-      color: var(--text);
-      background: var(--bg);
-      outline: none;
-      -webkit-appearance: none;
-      transition: border-color 0.15s;
-    }
-    .chat-input::placeholder { color: var(--text-muted); }
-    .chat-input:focus { border-color: var(--accent); }
-    .chat-input:focus-visible { border-color: var(--accent); outline: none; }
-
-    .chat-send-btn {
-      flex-shrink: 0;
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      border: none;
-      background: var(--accent);
-      color: #fff;
+    .patient-row {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
       cursor: pointer;
+      transition: background 0.12s;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s, transform 0.1s;
-      -webkit-appearance: none;
+      align-items: flex-start;
+      gap: 10px;
     }
-    .chat-send-btn:hover { background: var(--accent-dark); }
-    .chat-send-btn:active { transform: scale(0.93); }
-    .chat-send-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-    .chat-send-btn:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+    .patient-row:hover { background: var(--bg); }
+    .patient-row.selected { background: var(--accent-light); border-left: 3px solid var(--accent); }
 
-    /* Emergency overlay */
-    .emergency-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 999;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 32px 24px;
-    }
-    .emergency-overlay.visible { display: flex; }
-    .emergency-overlay-card {
-      background: var(--surface);
-      border-radius: 16px;
-      border-top: 4px solid var(--red);
-      padding: 28px 24px 24px;
-      width: 100%;
-      max-width: 380px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .emergency-overlay h2 {
-      color: var(--red);
-      font-size: 20px;
-      font-weight: 700;
-      line-height: 1.3;
-    }
-    .emergency-overlay p {
-      color: var(--text);
-      font-size: 15px;
-      line-height: 1.6;
-    }
-    .overlay-911-link {
-      display: block;
-      background: var(--red);
-      color: #fff;
-      font-size: 18px;
-      font-weight: 700;
-      padding: 16px 24px;
-      border-radius: 10px;
-      text-decoration: none;
-      text-align: center;
-      min-height: 56px;
-      line-height: 1.3;
+    .risk-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
       margin-top: 4px;
     }
-    .overlay-911-link:focus-visible {
-      outline: 2px solid var(--red);
-      outline-offset: 3px;
-    }
-    .overlay-dismiss {
-      color: var(--text-muted);
-      font-size: 14px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-family: var(--font);
-      text-align: center;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      min-height: 44px;
-      width: 100%;
-    }
-    .overlay-dismiss:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
+    .risk-dot.high { background: var(--red); }
+    .risk-dot.medium { background: #DD6B20; }
+    .risk-dot.low { background: var(--green); }
 
+    .patient-row-info { flex: 1; min-width: 0; }
+    .patient-row-name { font-weight: 600; font-size: 13px; }
+    .patient-row-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .patient-row-flag { font-size: 11px; color: var(--text-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ══════════════════════════════════════
-       SCREEN 2 — REVIEW
-    ══════════════════════════════════════ */
-    #screen-review {
-      background: var(--bg);
-    }
-    .review-header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 24px 20px 20px;
+    .risk-score-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
       flex-shrink: 0;
     }
-    .review-header h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 4px;
-      line-height: 1.35;
-      text-wrap: balance;
-    }
-    .review-header p {
-      font-size: 14px;
-      color: var(--text-muted);
-    }
+    .risk-score-badge.high { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+    .risk-score-badge.medium { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange-border); }
+    .risk-score-badge.low { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 
-    .review-body {
+    /* ── Detail panel ── */
+    .detail-panel {
       flex: 1;
       overflow-y: auto;
-      padding: 24px 20px;
+      padding: 20px 24px;
+    }
+
+    .empty-state {
       display: flex;
       flex-direction: column;
-      gap: 24px;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .review-section-title {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--text-muted);
-      margin-bottom: 10px;
-    }
-
-    .review-table-wrap {
-      background: var(--surface);
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-    .review-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    .review-table thead th {
-      background: var(--bg-alt);
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-    }
-    .review-table thead th:first-child {
-      border-right: 1px solid var(--border);
-    }
-    .review-table tbody tr:nth-child(even) td {
-      background: #FDFBF8;
-    }
-    .review-table tbody tr:nth-child(odd) td {
-      background: var(--surface);
-    }
-    .review-table td {
-      padding: 12px 14px;
-      vertical-align: top;
-      line-height: 1.5;
-      border-top: 1px solid var(--border-light);
-      color: var(--text);
-    }
-    .review-table td:first-child {
-      border-right: 1px solid var(--border-light);
-      color: var(--text-muted);
-      font-size: 13px;
-    }
-    .review-table td:last-child {
-      font-weight: 500;
-    }
-
-    .review-meta-wrap {
-      background: var(--surface);
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      overflow: hidden;
-    }
-    .review-meta-row {
-      display: flex;
-      align-items: baseline;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border-light);
-      gap: 12px;
-    }
-    .review-meta-row:last-child { border-bottom: none; }
-    .review-meta-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      flex-shrink: 0;
-      min-width: 76px;
-      font-weight: 600;
-    }
-    .review-meta-value {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text);
-    }
-
-    .location-section label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-    .location-input {
-      width: 100%;
-      height: 52px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 0 16px;
-      font-family: var(--font);
-      font-size: 16px;
-      color: var(--text);
-      background: var(--surface);
-      outline: none;
-      -webkit-appearance: none;
-      transition: border-color 0.15s;
-    }
-    .location-input::placeholder { color: var(--text-muted); }
-    .location-input:focus { border-color: var(--accent); }
-    .location-input:focus-visible { border-color: var(--accent); outline: none; }
-    .location-hint {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 6px;
-    }
-
-    .review-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-
-    /* ══════════════════════════════════════
-       SCREEN 3 — LOADING
-    ══════════════════════════════════════ */
-    #screen-loading {
       align-items: center;
       justify-content: center;
-      gap: 24px;
-      padding: 48px 32px;
-      text-align: center;
-      background: var(--bg);
-    }
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    #screen-loading h2 {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text);
-      line-height: 1.45;
-      text-wrap: balance;
-    }
-    #screen-loading p {
-      font-size: 14px;
+      height: 100%;
       color: var(--text-muted);
+      text-align: center;
+      gap: 8px;
     }
+    .empty-state svg { opacity: 0.3; }
+    .empty-state p { font-size: 15px; }
+    .empty-state small { font-size: 12px; }
 
+    /* ── Patient detail ── */
+    .patient-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .patient-name-block h2 { font-size: 20px; font-weight: 700; }
+    .patient-name-block p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
-    /* ══════════════════════════════════════
-       SCREEN 4 — RESULT
-    ══════════════════════════════════════ */
-    #screen-result {
-      background: var(--bg);
-    }
-    .result-header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 20px 20px 18px;
-      flex-shrink: 0;
-    }
-    .result-header h1 {
+    .risk-badge-large {
+      padding: 6px 14px;
+      border-radius: 8px;
       font-size: 13px;
       font-weight: 700;
+      border: 2px solid;
+      flex-shrink: 0;
+    }
+    .risk-badge-large.high { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+    .risk-badge-large.medium { background: var(--orange-bg); color: var(--orange); border-color: var(--orange-border); }
+    .risk-badge-large.low { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+
+    /* ── AI Summary ── */
+    .ai-summary {
+      background: var(--accent-light);
+      border: 1px solid #BEE3F8;
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .ai-summary-label {
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 6px;
     }
 
-    .result-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 24px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    /* Destination card */
-    .dest-card {
-      background: var(--surface);
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      border-left: 5px solid var(--accent);
-      padding: 22px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .dest-card-label {
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--text);
-      line-height: 1.2;
-    }
-    .dest-card-sublabel {
-      font-size: 14px;
-      color: var(--text-muted);
-    }
-
-    /* Result content card */
-    .result-card {
-      background: var(--surface);
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .result-section-title {
+    /* ── Flags ── */
+    .flags-section { margin-bottom: 16px; }
+    .section-title {
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
+      letter-spacing: 0.08em;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-    .result-reasoning {
-      font-size: 15px;
-      color: var(--text);
-      line-height: 1.65;
+    .flags-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .flag-chip {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid;
     }
-    .result-divider {
-      height: 1px;
-      background: var(--border-light);
-      margin: 0 -20px;
-    }
-    .result-list {
-      list-style: none;
+    .flag-chip.high { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+    .flag-chip.medium { background: var(--orange-bg); color: var(--orange); border-color: var(--orange-border); }
+    .flag-chip.low { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+
+    /* ── Tabs ── */
+    .tabs {
       display: flex;
-      flex-direction: column;
-      gap: 7px;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 14px;
     }
-    .result-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      font-size: 14px;
-      line-height: 1.55;
-      color: var(--text);
-    }
-    .result-list li::before {
-      content: "–";
-      color: var(--accent);
-      font-weight: 700;
-      flex-shrink: 0;
-      line-height: 1.55;
-    }
-
-    .result-community-note {
+    .tab {
+      padding: 8px 14px;
       font-size: 13px;
-      color: var(--text-muted);
-      font-style: italic;
-      line-height: 1.6;
-    }
-    .result-wait-times {
-      background: var(--bg-alt);
-      border-radius: 8px;
-      padding: 12px 14px;
-      font-size: 13px;
-      color: var(--text-muted);
-      line-height: 1.55;
-    }
-
-    .result-healthlink-link {
-      display: block;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--accent);
-      text-decoration: none;
-      padding: 14px 0;
-      border-top: 1px solid var(--border-light);
-    }
-    .result-healthlink-link:hover { text-decoration: underline; }
-    .result-healthlink-link:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-
-    /* 811 box */
-    .result-811-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .result-811-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--purple-gray);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .result-811-box p {
-      font-size: 14px;
-      color: var(--text-muted);
-      line-height: 1.55;
-    }
-    .result-811-link {
-      display: block;
-      color: var(--purple-gray);
-      font-weight: 600;
-      font-size: 15px;
-      text-decoration: none;
-      border: 1.5px solid var(--purple-gray);
-      border-radius: 8px;
-      padding: 12px 16px;
-      text-align: center;
-      min-height: 48px;
-      line-height: 1.4;
-      transition: background 0.15s;
-    }
-    .result-811-link:hover { background: var(--purple-gray-light); }
-    .result-811-link:focus-visible {
-      outline: 2px solid var(--purple-gray);
-      outline-offset: 3px;
-    }
-
-    .result-disclaimer {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.65;
-      text-align: center;
-      padding: 0 4px;
-    }
-
-    .start-over-link {
-      display: block;
-      text-align: center;
-      font-size: 14px;
-      color: var(--text-muted);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      padding: 12px;
-      cursor: pointer;
+      font-family: var(--font);
       background: none;
       border: none;
-      font-family: var(--font);
-      width: 100%;
-      min-height: 48px;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
     }
-    .start-over-link:hover { color: var(--text); }
-    .start-over-link:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Tables ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .data-table th {
+      text-align: left;
+      padding: 6px 10px;
+      background: var(--bg);
+      border-bottom: 2px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    .data-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--bg); }
+
+    .badge-er { background: var(--red-bg); color: var(--red); padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+    .badge-outpatient { background: var(--accent-light); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+    .badge-abnormal { color: var(--red); font-weight: 700; }
+    .badge-normal { color: var(--text-muted); }
+
+    /* ── Vitals grid ── */
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .vital-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .vital-card.alert { background: var(--red-bg); border-color: var(--red-border); }
+    .vital-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    .vital-value { font-size: 22px; font-weight: 700; margin: 4px 0 2px; }
+    .vital-card.alert .vital-value { color: var(--red); }
+    .vital-unit { font-size: 10px; color: var(--text-muted); }
+
+    .loading-text { color: var(--text-muted); font-size: 13px; padding: 20px; text-align: center; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 640px) {
+      .patient-list-panel { width: 100%; height: 40vh; border-right: none; border-bottom: 1px solid var(--border); }
+      .layout { flex-direction: column; }
+      .detail-panel { padding: 14px; }
+      .vitals-grid { grid-template-columns: repeat(2, 1fr); }
+      .header-stats { display: none; }
     }
   </style>
 </head>
 <body>
-<a class="skip-link" href="#main-content">Skip to main content</a>
-<div id="app">
 
-  <!-- ══ SCREEN 0: EMERGENCY ══ -->
-  <main class="screen active" id="screen-emergency" aria-labelledby="emergency-heading">
-    <div class="emergency-top-bar" role="presentation"></div>
-
-    <nav class="progress-bar" aria-label="Step 1 of 4">
-      <span class="progress-dot active" aria-hidden="true"></span>
-      <span class="progress-dot" aria-hidden="true"></span>
-      <span class="progress-dot" aria-hidden="true"></span>
-      <span class="progress-dot" aria-hidden="true"></span>
-      <span class="progress-label">Step 1 of 4</span>
-    </nav>
-
-    <div class="emergency-card" id="main-content">
-      <h1 id="emergency-heading">Is this a life-threatening emergency?</h1>
-      <ul class="emergency-list" aria-label="Call 911 immediately if you have any of the following">
-        <li>Chest pain or pressure (possible heart attack)</li>
-        <li>Stroke signs — face drooping, arm weakness, or slurred speech</li>
-        <li>Unconscious or not breathing</li>
-        <li>Severe allergic reaction — throat closing or unable to swallow</li>
-        <li>Seizure or suspected overdose</li>
-        <li>Thoughts of harming yourself or someone else</li>
-      </ul>
-    </div>
-
-    <div class="emergency-actions">
-      <a href="tel:911" class="btn btn-red" aria-label="Call 911 for emergency">Call 911</a>
-      <a href="tel:988" class="btn btn-outline" aria-label="Call 9-8-8 for mental health crisis">Mental health crisis — Call 9-8-8</a>
-      <button class="btn btn-outline" id="btn-not-emergency">None of these apply — continue</button>
-    </div>
-  </main>
-
-  <!-- ══ SCREEN 1: CHAT ══ -->
-  <main class="screen" id="screen-chat" aria-label="Care guide chat">
-    <header class="chat-header">
-      <div class="chat-header-inner">
-        <h1>BC Care Navigator</h1>
-        <span class="chat-guide-label" aria-label="Care Guide">Care Guide</span>
-      </div>
-      <p class="chat-header-sub">Tell me what's going on and I'll help find the right care</p>
-    </header>
-
-    <nav class="progress-bar" aria-label="Step 2 of 4">
-      <span class="progress-dot done" aria-hidden="true"></span>
-      <span class="progress-dot active" aria-hidden="true"></span>
-      <span class="progress-dot" aria-hidden="true"></span>
-      <span class="progress-dot" aria-hidden="true"></span>
-      <span class="progress-label">Step 2 of 4</span>
-    </nav>
-
-    <div
-      class="chat-messages"
-      id="chat-messages"
-      role="log"
-      aria-live="polite"
-      aria-label="Chat messages"
-      tabindex="0"
-    ></div>
-
-    <div class="chat-input-area" role="form" aria-label="Send a message">
-      <label for="chat-input" class="sr-only">Describe what's going on</label>
-      <textarea
-        class="chat-input"
-        id="chat-input"
-        placeholder="Describe what's going on…"
-        rows="1"
-        aria-label="Type your message"
-        autocomplete="off"
-        autocorrect="on"
-        spellcheck="true"
-      ></textarea>
-      <button class="chat-send-btn" id="chat-send-btn" aria-label="Send message" type="button">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
-  </main>
-
-  <!-- ══ SCREEN 2: REVIEW ══ -->
-  <main class="screen" id="screen-review" aria-labelledby="review-heading">
-    <header class="review-header">
-      <h1 id="review-heading">Here's what we understood</h1>
-      <p>Please check this before we find care for you</p>
-    </header>
-
-    <nav class="progress-bar" aria-label="Step 3 of 4">
-      <span class="progress-dot done" aria-hidden="true"></span>
-      <span class="progress-dot done" aria-hidden="true"></span>
-      <span class="progress-dot active" aria-hidden="true"></span>
-      <span class="progress-dot" aria-hidden="true"></span>
-      <span class="progress-label">Step 3 of 4</span>
-    </nav>
-
-    <div class="review-body">
-      <section aria-labelledby="symptoms-section-title">
-        <div class="review-section-title" id="symptoms-section-title">Symptoms</div>
-        <div class="review-table-wrap" id="review-symptoms-wrap">
-          <table class="review-table" id="review-symptoms-table">
-            <thead>
-              <tr>
-                <th scope="col">What you said</th>
-                <th scope="col">What this means</th>
-              </tr>
-            </thead>
-            <tbody id="review-symptoms-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <div class="review-meta-wrap" id="review-meta" style="display:none;" role="region" aria-label="Details"></div>
-
-      <section>
-        <label for="location-input" class="review-section-title" style="display:block;margin-bottom:10px;">Your Location</label>
-        <input
-          type="text"
-          class="location-input"
-          id="location-input"
-          placeholder="City or postal code (e.g. Vancouver or V6B 1A1)…"
-          autocomplete="postal-code"
-          autocorrect="off"
-          spellcheck="false"
-          name="location"
-        />
-        <p class="location-hint" id="location-hint">Used to find clinics near you</p>
-      </section>
-
-      <div class="review-actions">
-        <button class="btn btn-accent" id="btn-looks-right" type="button">This looks right — find care</button>
-        <button class="btn btn-subtle" id="btn-fix-something" type="button">Go back and change something</button>
-      </div>
-    </div>
-  </main>
-
-  <!-- ══ SCREEN 3: LOADING ══ -->
-  <main class="screen" id="screen-loading" aria-label="Loading care options" aria-live="polite">
-    <div
-      class="spinner"
-      role="status"
-      aria-label="Loading care options near you"
-    ></div>
-    <h2>We're looking at care options near you</h2>
-    <p>This usually takes about 5 seconds</p>
-  </main>
-
-  <!-- ══ SCREEN 4: RESULT ══ -->
-  <main class="screen" id="screen-result" aria-labelledby="result-dest-label">
-    <header class="result-header">
-      <h1>Your Care Recommendation</h1>
-    </header>
-
-    <nav class="progress-bar" aria-label="Step 4 of 4 — Complete">
-      <span class="progress-dot done" aria-hidden="true"></span>
-      <span class="progress-dot done" aria-hidden="true"></span>
-      <span class="progress-dot done" aria-hidden="true"></span>
-      <span class="progress-dot active" aria-hidden="true"></span>
-      <span class="progress-label">Step 4 of 4</span>
-    </nav>
-
-    <div class="result-body">
-
-      <!-- Destination card -->
-      <div class="dest-card" id="result-dest-card" role="region" aria-labelledby="result-dest-label">
-        <div class="dest-card-label" id="result-dest-label"></div>
-        <div class="dest-card-sublabel" id="result-dest-sublabel"></div>
-      </div>
-
-      <!-- Reasoning + extras -->
-      <div class="result-card" id="result-main-card">
-        <div>
-          <div class="result-section-title">Why we recommend this</div>
-          <p class="result-reasoning" id="result-reasoning"></p>
-        </div>
-
-        <div class="result-divider"></div>
-
-        <div id="result-bring-section" style="display:none;">
-          <div class="result-section-title">What to bring</div>
-          <ul class="result-list" id="result-bring-list"></ul>
-        </div>
-
-        <div id="result-say-section" style="display:none;">
-          <div class="result-section-title">What to say when you arrive</div>
-          <ul class="result-list" id="result-say-list"></ul>
-        </div>
-
-        <p class="result-community-note" id="result-community-note" style="display:none;"></p>
-
-        <div class="result-wait-times" id="result-wait-times" style="display:none;" role="note"></div>
-
-        <a
-          class="result-healthlink-link"
-          id="result-healthlink-link"
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-          style="display:none;"
-        ></a>
-      </div>
-
-      <!-- 811 box -->
-      <aside class="result-811-box" aria-label="HealthLink BC 8-1-1">
-        <div class="result-811-title">Not sure? Free nurse line</div>
-        <p>Call 8-1-1 any time — free 24/7 health advice from a registered nurse in BC.</p>
-        <a href="tel:811" class="result-811-link" aria-label="Call 8-1-1 — HealthLink BC nurse line">Call 8-1-1 — HealthLink BC</a>
-      </aside>
-
-      <p class="result-disclaimer">
-        This is not medical advice. Always call 8-1-1 or 911 if you are unsure about any symptom.
-      </p>
-
-      <button class="start-over-link" id="btn-start-over" type="button">Start over</button>
-    </div>
-  </main>
-
-</div><!-- /#app -->
-
-<!-- Emergency overlay (shown mid-chat if AI detects emergency) -->
-<div
-  class="emergency-overlay"
-  id="emergency-overlay"
-  role="alertdialog"
-  aria-modal="true"
-  aria-labelledby="overlay-heading"
-  aria-describedby="overlay-desc"
->
-  <div class="emergency-overlay-card">
-    <h2 id="overlay-heading">This sounds like an emergency</h2>
-    <p id="overlay-desc">Based on what you've described, you may need emergency care right away. Please call 911 immediately.</p>
-    <a href="tel:911" class="overlay-911-link" aria-label="Call 911 now for emergency">Call 911 Now</a>
-    <button class="overlay-dismiss" id="overlay-dismiss" type="button">I'm okay — continue using the app</button>
+<header>
+  <div>
+    <h1>Patient Risk Dashboard</h1>
+    <p>Victoria, BC — Synthea Clinical Records</p>
   </div>
+  <div class="header-stats" id="header-stats">
+    <div class="header-stat"><strong id="stat-total">—</strong>Patients</div>
+    <div class="header-stat"><strong id="stat-high" style="color:#FEB2B2">—</strong>High Risk</div>
+    <div class="header-stat"><strong id="stat-medium" style="color:#FBD38D">—</strong>Med Risk</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Patient list -->
+  <aside class="patient-list-panel">
+    <div class="list-header">
+      <input class="search-box" id="search" type="text" placeholder="Search by name or ID…" autocomplete="off" />
+      <div class="list-filters">
+        <button class="filter-btn active-filter" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="high" style="color:var(--red)">High</button>
+        <button class="filter-btn" data-filter="medium" style="color:var(--orange)">Medium</button>
+        <button class="filter-btn" data-filter="low" style="color:var(--green)">Low</button>
+      </div>
+    </div>
+    <div class="patient-list" id="patient-list">
+      <p class="loading-text">Loading patients…</p>
+    </div>
+  </aside>
+
+  <!-- Detail panel -->
+  <main class="detail-panel" id="detail-panel">
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <p>Select a patient to view their risk profile</p>
+      <small>Patients are ranked by computed risk score</small>
+    </div>
+  </main>
+
 </div>
 
-<style>
-  /* Screen reader only helper */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-</style>
-
 <script>
-(function () {
-  'use strict';
-
-  /* ── API base ── */
   var API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+  var allPatients = [];
+  var currentFilter = 'all';
+  var selectedId = null;
 
-  /* ── State ── */
-  var chatMessages = [];
-  var extractedSymptoms = null;
-  var userLocation = '';
-
-  /* ── Destination metadata (simplified color system) ── */
-  var DEST_META = {
-    call_911:   { borderColor: '#DC2626', label: 'Call 911 Immediately',       sublabel: 'Life-threatening emergency', cls: 'call_911' },
-    go_to_er:   { borderColor: '#DC2626', label: 'Go to Emergency',            sublabel: 'Emergency room care needed', cls: 'go_to_er' },
-    upcc:       { borderColor: '#8B7355', label: 'Go to Urgent Primary Care',  sublabel: 'UPCC clinic near you',       cls: 'upcc' },
-    walk_in:    { borderColor: '#8B7355', label: 'Go to a Walk-In Clinic',     sublabel: 'Walk-in clinic near you',    cls: 'walk_in' },
-    pharmacist: { borderColor: '#8B7355', label: 'See a Pharmacist',           sublabel: 'Pharmacy care near you',     cls: 'pharmacist' },
-    call_811:   { borderColor: '#6B7A9A', label: 'Call 8-1-1',                sublabel: 'Free nurse advice, 24/7',    cls: 'call_811' },
-    home_care:  { borderColor: '#4A7C59', label: 'Rest at Home',               sublabel: 'Home care recommended',      cls: 'home_care' }
-  };
-
-  /* ── Element refs ── */
-  var screens = {
-    emergency: document.getElementById('screen-emergency'),
-    chat:      document.getElementById('screen-chat'),
-    review:    document.getElementById('screen-review'),
-    loading:   document.getElementById('screen-loading'),
-    result:    document.getElementById('screen-result')
-  };
-
-  /* ── Screen navigation ── */
-  function showScreen(name) {
-    var keys = Object.keys(screens);
-    for (var i = 0; i < keys.length; i++) {
-      var el = screens[keys[i]];
-      el.classList.remove('active');
-      el.style.display = '';
-    }
-    var target = screens[name];
-    if (target) {
-      target.style.display = 'flex';
-      setTimeout(function () {
-        target.classList.add('active');
-      }, 20);
-    }
-    window.scrollTo(0, 0);
-  }
-
-  /* ── Screen 0 ── */
-  document.getElementById('btn-not-emergency').addEventListener('click', function () {
-    showScreen('chat');
-    if (chatMessages.length === 0) {
-      addClaudeMessage("Hi, I'm here to help you find the right care. What's going on today?");
-    }
-  });
-
-  /* ── Chat helpers ── */
-  var chatMessagesEl = document.getElementById('chat-messages');
-
-  function scrollToBottom() {
-    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-  }
-
-  function addUserBubble(text) {
-    var wrap = document.createElement('div');
-    wrap.className = 'bubble-wrap user';
-    var label = document.createElement('div');
-    label.className = 'bubble-label';
-    label.textContent = 'You';
-    var bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = text;
-    wrap.appendChild(label);
-    wrap.appendChild(bubble);
-    chatMessagesEl.appendChild(wrap);
-    scrollToBottom();
-  }
-
-  function addClaudeMessage(text) {
-    var wrap = document.createElement('div');
-    wrap.className = 'bubble-wrap claude';
-    var label = document.createElement('div');
-    label.className = 'bubble-label';
-    label.textContent = 'Care Guide';
-    var bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = text;
-    wrap.appendChild(label);
-    wrap.appendChild(bubble);
-    chatMessagesEl.appendChild(wrap);
-    scrollToBottom();
-    chatMessages.push({ role: 'assistant', content: text });
-  }
-
-  function showTypingIndicator() {
-    var wrap = document.createElement('div');
-    wrap.className = 'bubble-wrap claude';
-    wrap.id = 'typing-wrap';
-    var label = document.createElement('div');
-    label.className = 'bubble-label';
-    label.textContent = 'Care Guide';
-    var bubble = document.createElement('div');
-    bubble.className = 'typing-bubble';
-    bubble.setAttribute('aria-label', 'Care Guide is typing');
-    bubble.textContent = '...';
-    wrap.appendChild(label);
-    wrap.appendChild(bubble);
-    chatMessagesEl.appendChild(wrap);
-    scrollToBottom();
-    return wrap;
-  }
-
-  function removeTypingIndicator() {
-    var el = document.getElementById('typing-wrap');
-    if (el) el.parentNode.removeChild(el);
-  }
-
-  function showChatError() {
-    var wrap = document.createElement('div');
-    wrap.className = 'bubble-wrap claude';
-    var label = document.createElement('div');
-    label.className = 'bubble-label';
-    label.textContent = 'Care Guide';
-    var bubble = document.createElement('div');
-    bubble.className = 'chat-error-bubble';
-    bubble.setAttribute('role', 'alert');
-    bubble.textContent = 'Something went wrong. Please call 8-1-1 at 1-800-811-2101 for free nurse advice.';
-    wrap.appendChild(label);
-    wrap.appendChild(bubble);
-    chatMessagesEl.appendChild(wrap);
-    scrollToBottom();
-  }
-
-  /* ── Auto-resize textarea ── */
-  var chatInput = document.getElementById('chat-input');
-  chatInput.addEventListener('input', function () {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-  });
-
-  /* ── Send message ── */
-  var sendBtn = document.getElementById('chat-send-btn');
-  var isSending = false;
-
-  function sendMessage() {
-    if (isSending) return;
-    var text = chatInput.value.trim();
-    if (!text) return;
-
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-    chatMessages.push({ role: 'user', content: text });
-    addUserBubble(text);
-
-    isSending = true;
-    sendBtn.disabled = true;
-    chatInput.disabled = true;
-
-    showTypingIndicator();
-
-    fetch(API_BASE + '/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: chatMessages.slice(),
-        location: userLocation || ''
-      })
+  // Load all patients
+  fetch(API_BASE + '/api/patients?limit=200')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      allPatients = data;
+      updateStats(data);
+      renderList(data);
     })
-    .then(function (res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    })
-    .then(function (data) {
-      removeTypingIndicator();
+    .catch(function() {
+      document.getElementById('patient-list').innerHTML = '<p class="loading-text">Could not load patients.</p>';
+    });
 
-      if (data.is_emergency) {
-        showEmergencyOverlay();
-        isSending = false;
-        sendBtn.disabled = false;
-        chatInput.disabled = false;
-        return;
-      }
+  function updateStats(patients) {
+    document.getElementById('stat-total').textContent = patients.length;
+    document.getElementById('stat-high').textContent = patients.filter(function(p) { return p.risk_level === 'high'; }).length;
+    document.getElementById('stat-medium').textContent = patients.filter(function(p) { return p.risk_level === 'medium'; }).length;
+  }
 
-      if (data.ready_for_review) {
-        extractedSymptoms = data.extracted_symptoms;
-        isSending = false;
-        sendBtn.disabled = false;
-        chatInput.disabled = false;
-        populateReviewScreen(extractedSymptoms);
-        showScreen('review');
-        return;
-      }
+  function renderList(patients) {
+    var filtered = currentFilter === 'all' ? patients : patients.filter(function(p) { return p.risk_level === currentFilter; });
+    var el = document.getElementById('patient-list');
+    if (filtered.length === 0) {
+      el.innerHTML = '<p class="loading-text">No patients match this filter.</p>';
+      return;
+    }
+    el.innerHTML = filtered.map(function(p) {
+      var levelLabel = p.risk_level === 'high' ? 'HIGH' : p.risk_level === 'medium' ? 'MED' : 'LOW';
+      var topFlag = p.top_flags && p.top_flags.length > 0 ? p.top_flags[0] : 'No critical flags';
+      return '<div class="patient-row' + (selectedId === p.patient_id ? ' selected' : '') + '" data-id="' + p.patient_id + '">' +
+        '<div class="risk-dot ' + p.risk_level + '"></div>' +
+        '<div class="patient-row-info">' +
+          '<div class="patient-row-name">' + p.first_name + ' ' + p.last_name + '</div>' +
+          '<div class="patient-row-meta">' + p.age + 'yo ' + p.sex + ' · ' + p.patient_id + '</div>' +
+          '<div class="patient-row-flag">' + topFlag + '</div>' +
+        '</div>' +
+        '<span class="risk-score-badge ' + p.risk_level + '">' + levelLabel + ' ' + p.risk_score + '</span>' +
+      '</div>';
+    }).join('');
 
-      if (data.reply) {
-        addClaudeMessage(data.reply);
-      }
-
-      isSending = false;
-      sendBtn.disabled = false;
-      chatInput.disabled = false;
-      chatInput.focus();
-    })
-    .catch(function () {
-      removeTypingIndicator();
-      showChatError();
-      chatMessages.pop();
-      isSending = false;
-      sendBtn.disabled = false;
-      chatInput.disabled = false;
-      chatInput.focus();
+    el.querySelectorAll('.patient-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        selectedId = this.getAttribute('data-id');
+        loadPatient(selectedId);
+        renderList(allPatients.filter(function(p) {
+          var s = document.getElementById('search').value.toLowerCase();
+          return !s || p.first_name.toLowerCase().includes(s) || p.last_name.toLowerCase().includes(s) || p.patient_id.toLowerCase().includes(s);
+        }));
+      });
     });
   }
 
-  sendBtn.addEventListener('click', sendMessage);
-  chatInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  // Search
+  document.getElementById('search').addEventListener('input', function() {
+    var s = this.value.toLowerCase();
+    var filtered = s ? allPatients.filter(function(p) {
+      return p.first_name.toLowerCase().includes(s) || p.last_name.toLowerCase().includes(s) || p.patient_id.toLowerCase().includes(s);
+    }) : allPatients;
+    renderList(filtered);
   });
 
-  /* ── Emergency overlay ── */
-  var emergencyOverlay = document.getElementById('emergency-overlay');
+  // Filters
+  document.querySelectorAll('.filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active-filter'); });
+      this.classList.add('active-filter');
+      currentFilter = this.getAttribute('data-filter');
+      var s = document.getElementById('search').value.toLowerCase();
+      var filtered = s ? allPatients.filter(function(p) {
+        return p.first_name.toLowerCase().includes(s) || p.last_name.toLowerCase().includes(s);
+      }) : allPatients;
+      renderList(filtered);
+    });
+  });
 
-  function showEmergencyOverlay() {
-    emergencyOverlay.classList.add('visible');
-    var dismissBtn = document.getElementById('overlay-dismiss');
-    dismissBtn.focus();
+  // Load patient detail
+  function loadPatient(patientId) {
+    var panel = document.getElementById('detail-panel');
+    panel.innerHTML = '<p class="loading-text">Loading patient data…</p>';
+
+    fetch(API_BASE + '/api/patient/' + patientId)
+      .then(function(r) { return r.json(); })
+      .then(function(p) { renderDetail(p); })
+      .catch(function() {
+        panel.innerHTML = '<p class="loading-text">Could not load patient details.</p>';
+      });
   }
 
-  document.getElementById('overlay-dismiss').addEventListener('click', function () {
-    emergencyOverlay.classList.remove('visible');
-    chatInput.focus();
-  });
+  function renderDetail(p) {
+    var panel = document.getElementById('detail-panel');
+    var levelLabel = p.risk_level === 'high' ? 'HIGH RISK' : p.risk_level === 'medium' ? 'MEDIUM RISK' : 'LOW RISK';
 
-  /* ── Screen 2: Review ── */
-  function populateReviewScreen(symptoms) {
-    var tbody = document.getElementById('review-symptoms-body');
-    tbody.innerHTML = '';
+    var flagsHtml = p.flags.map(function(f) {
+      return '<span class="flag-chip ' + f.severity + '">' + f.label + '</span>';
+    }).join('');
+    if (!flagsHtml) flagsHtml = '<span class="flag-chip low">No critical flags identified</span>';
 
-    if (symptoms && symptoms.plain_descriptions && symptoms.plain_descriptions.length > 0) {
-      for (var i = 0; i < symptoms.plain_descriptions.length; i++) {
-        var item = symptoms.plain_descriptions[i];
-        var tr = document.createElement('tr');
-        var td1 = document.createElement('td');
-        td1.textContent = item.patient_words || '';
-        var td2 = document.createElement('td');
-        td2.textContent = item.clinical_term || '';
-        tr.appendChild(td1);
-        tr.appendChild(td2);
-        tbody.appendChild(tr);
-      }
-    } else {
-      var tr = document.createElement('tr');
-      var td = document.createElement('td');
-      td.setAttribute('colspan', '2');
-      td.textContent = 'No specific symptoms recorded.';
-      td.style.color = 'var(--text-muted)';
-      td.style.fontStyle = 'italic';
-      tr.appendChild(td);
-      tbody.appendChild(tr);
+    // Encounters tab
+    var encHtml = p.recent_encounters.length === 0 ? '<p style="color:var(--text-muted);padding:12px">No encounters on record.</p>' :
+      '<table class="data-table"><thead><tr><th>Date</th><th>Type</th><th>Facility</th><th>Complaint</th><th>Diagnosis</th><th>Triage</th></tr></thead><tbody>' +
+      p.recent_encounters.map(function(e) {
+        var badge = e.encounter_type === 'emergency' ? '<span class="badge-er">ER</span>' : '<span class="badge-outpatient">' + e.encounter_type + '</span>';
+        var triage = e.triage_level <= 2 ? '<strong style="color:var(--red)">' + e.triage_level + '</strong>' : e.triage_level;
+        return '<tr><td>' + e.encounter_date + '</td><td>' + badge + '</td><td>' + e.facility + '</td><td>' + e.chief_complaint + '</td><td>' + e.diagnosis_description + '</td><td>' + triage + '</td></tr>';
+      }).join('') + '</tbody></table>';
+
+    // Meds tab
+    var medsHtml = p.active_medications.length === 0 ? '<p style="color:var(--text-muted);padding:12px">No active medications.</p>' :
+      '<table class="data-table"><thead><tr><th>Drug</th><th>Dose</th><th>Frequency</th><th>Prescriber</th><th>Since</th></tr></thead><tbody>' +
+      p.active_medications.map(function(m) {
+        return '<tr><td><strong>' + m.drug_name + '</strong></td><td>' + m.dosage + '</td><td>' + m.frequency + '</td><td>' + m.prescriber + '</td><td>' + m.start_date + '</td></tr>';
+      }).join('') + '</tbody></table>';
+
+    // Labs tab
+    var labsHtml = p.recent_labs.length === 0 ? '<p style="color:var(--text-muted);padding:12px">No lab results on record.</p>' :
+      '<table class="data-table"><thead><tr><th>Test</th><th>Result</th><th>Reference</th><th>Flag</th><th>Date</th></tr></thead><tbody>' +
+      p.recent_labs.map(function(l) {
+        var isAbnormal = l.abnormal_flag && l.abnormal_flag !== 'N';
+        var flagClass = isAbnormal ? 'badge-abnormal' : 'badge-normal';
+        return '<tr><td>' + l.test_name + '</td><td><strong>' + l.value + '</strong> ' + l.unit + '</td><td>' + l.reference_range + ' ' + l.unit + '</td><td class="' + flagClass + '">' + (isAbnormal ? '⚠ ' : '') + l.abnormal_flag + '</td><td>' + l.collected_date + '</td></tr>';
+      }).join('') + '</tbody></table>';
+
+    // Vitals tab
+    var vitalsHtml = '<p style="color:var(--text-muted);padding:12px">No vitals on record.</p>';
+    if (p.latest_vitals) {
+      var v = p.latest_vitals;
+      var o2Alert = v.o2_saturation < 95;
+      var bpAlert = v.systolic_bp >= 140;
+      var hrAlert = v.heart_rate > 100 || v.heart_rate < 55;
+      var tempAlert = v.temperature_celsius >= 38.5;
+      vitalsHtml = '<p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Recorded: ' + v.recorded_at + '</p>' +
+        '<div class="vitals-grid">' +
+        vitalCard('Heart Rate', v.heart_rate, 'bpm', hrAlert) +
+        vitalCard('Blood Pressure', v.systolic_bp + '/' + v.diastolic_bp, 'mmHg', bpAlert) +
+        vitalCard('O₂ Saturation', v.o2_saturation, '%', o2Alert) +
+        vitalCard('Temperature', v.temperature_celsius, '°C', tempAlert) +
+        vitalCard('Resp. Rate', v.respiratory_rate, '/min', false) +
+        vitalCard('Pain Scale', v.pain_scale, '/10', v.pain_scale >= 7) +
+        '</div>';
     }
 
-    var metaEl = document.getElementById('review-meta');
-    metaEl.innerHTML = '';
-    var hasMeta = false;
+    panel.innerHTML =
+      '<div class="patient-header">' +
+        '<div class="patient-name-block">' +
+          '<h2>' + p.first_name + ' ' + p.last_name + '</h2>' +
+          '<p>' + p.age + 'yo ' + p.sex + ' · DOB ' + p.date_of_birth + ' · ' + p.postal_code + ' · ' + p.primary_language + ' · ' + p.blood_type + '</p>' +
+        '</div>' +
+        '<div class="risk-badge-large ' + p.risk_level + '">' + levelLabel + ' — Score ' + p.risk_score + '</div>' +
+      '</div>' +
 
-    if (symptoms && symptoms.duration) {
-      var row = document.createElement('div');
-      row.className = 'review-meta-row';
-      var lbl = document.createElement('span');
-      lbl.className = 'review-meta-label';
-      lbl.textContent = 'Duration';
-      var val = document.createElement('span');
-      val.className = 'review-meta-value';
-      val.textContent = symptoms.duration;
-      row.appendChild(lbl);
-      row.appendChild(val);
-      metaEl.appendChild(row);
-      hasMeta = true;
-    }
+      '<div class="ai-summary">' +
+        '<div class="ai-summary-label">AI Clinical Summary</div>' +
+        p.ai_summary +
+      '</div>' +
 
-    if (symptoms && symptoms.severity) {
-      var row2 = document.createElement('div');
-      row2.className = 'review-meta-row';
-      var lbl2 = document.createElement('span');
-      lbl2.className = 'review-meta-label';
-      lbl2.textContent = 'Severity';
-      var val2 = document.createElement('span');
-      val2.className = 'review-meta-value';
-      val2.textContent = symptoms.severity;
-      row2.appendChild(lbl2);
-      row2.appendChild(val2);
-      metaEl.appendChild(row2);
-      hasMeta = true;
-    }
+      '<div class="flags-section">' +
+        '<div class="section-title">Risk Flags</div>' +
+        '<div class="flags-list">' + flagsHtml + '</div>' +
+      '</div>' +
 
-    metaEl.style.display = hasMeta ? 'block' : 'none';
+      '<div class="tabs">' +
+        '<button class="tab active" data-tab="encounters">Encounters (' + p.recent_encounters.length + ')</button>' +
+        '<button class="tab" data-tab="meds">Medications (' + p.active_medications.length + ')</button>' +
+        '<button class="tab" data-tab="labs">Labs (' + p.recent_labs.length + ')</button>' +
+        '<button class="tab" data-tab="vitals">Vitals</button>' +
+      '</div>' +
 
-    document.getElementById('location-input').value = userLocation || '';
-  }
+      '<div class="tab-content active" id="tab-encounters">' + encHtml + '</div>' +
+      '<div class="tab-content" id="tab-meds">' + medsHtml + '</div>' +
+      '<div class="tab-content" id="tab-labs">' + labsHtml + '</div>' +
+      '<div class="tab-content" id="tab-vitals">' + vitalsHtml + '</div>';
 
-  document.getElementById('btn-looks-right').addEventListener('click', function () {
-    var locVal = document.getElementById('location-input').value.trim();
-    userLocation = locVal;
-    showScreen('loading');
-    callNavigate();
-  });
-
-  document.getElementById('btn-fix-something').addEventListener('click', function () {
-    showScreen('chat');
-    addClaudeMessage("No problem — what would you like to add or change?");
-  });
-
-  /* ── Navigate API call ── */
-  function callNavigate() {
-    fetch(API_BASE + '/api/navigate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        extracted_symptoms: extractedSymptoms,
-        location: userLocation
-      })
-    })
-    .then(function (res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    })
-    .then(function (data) {
-      populateResultScreen(data);
-      showScreen('result');
-    })
-    .catch(function () {
-      populateResultScreenError();
-      showScreen('result');
+    // Tab switching
+    panel.querySelectorAll('.tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        panel.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        panel.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+        this.classList.add('active');
+        panel.querySelector('#tab-' + this.getAttribute('data-tab')).classList.add('active');
+      });
     });
   }
 
-  /* ── Screen 4: Result ── */
-  function populateResultScreen(data) {
-    var dest = data.destination || 'call_811';
-    var meta = DEST_META[dest] || DEST_META['call_811'];
-
-    var card = document.getElementById('result-dest-card');
-    card.className = 'dest-card ' + meta.cls;
-    card.style.borderLeftColor = meta.borderColor;
-
-    document.getElementById('result-dest-label').textContent = meta.label;
-    document.getElementById('result-dest-sublabel').textContent = meta.sublabel;
-
-    document.getElementById('result-reasoning').textContent = data.reasoning || '';
-
-    var bringSection = document.getElementById('result-bring-section');
-    var bringList = document.getElementById('result-bring-list');
-    bringList.innerHTML = '';
-    if (data.what_to_bring && data.what_to_bring.length > 0) {
-      for (var i = 0; i < data.what_to_bring.length; i++) {
-        var li = document.createElement('li');
-        li.textContent = data.what_to_bring[i];
-        bringList.appendChild(li);
-      }
-      bringSection.style.display = 'block';
-    } else {
-      bringSection.style.display = 'none';
-    }
-
-    var saySection = document.getElementById('result-say-section');
-    var sayList = document.getElementById('result-say-list');
-    sayList.innerHTML = '';
-    if (data.what_to_say && data.what_to_say.length > 0) {
-      for (var j = 0; j < data.what_to_say.length; j++) {
-        var li2 = document.createElement('li');
-        li2.textContent = data.what_to_say[j];
-        sayList.appendChild(li2);
-      }
-      saySection.style.display = 'block';
-    } else {
-      saySection.style.display = 'none';
-    }
-
-    var communityEl = document.getElementById('result-community-note');
-    if (data.community_context) {
-      communityEl.textContent = data.community_context;
-      communityEl.style.display = 'block';
-    } else {
-      communityEl.style.display = 'none';
-    }
-
-    var waitEl = document.getElementById('result-wait-times');
-    if (data.wait_times_context) {
-      waitEl.textContent = data.wait_times_context;
-      waitEl.style.display = 'block';
-    } else {
-      waitEl.style.display = 'none';
-    }
-
-    var hlLink = document.getElementById('result-healthlink-link');
-    if (data.healthlink_url) {
-      hlLink.href = data.healthlink_url;
-      hlLink.textContent = 'Find your nearest ' + meta.label + ' \u2192';
-      hlLink.style.display = 'block';
-    } else {
-      hlLink.style.display = 'none';
-    }
+  function vitalCard(label, value, unit, alert) {
+    return '<div class="vital-card' + (alert ? ' alert' : '') + '">' +
+      '<div class="vital-label">' + label + '</div>' +
+      '<div class="vital-value">' + value + '</div>' +
+      '<div class="vital-unit">' + unit + '</div>' +
+    '</div>';
   }
-
-  function populateResultScreenError() {
-    var meta = DEST_META['call_811'];
-    var card = document.getElementById('result-dest-card');
-    card.className = 'dest-card call_811';
-    card.style.borderLeftColor = meta.borderColor;
-    document.getElementById('result-dest-label').textContent = meta.label;
-    document.getElementById('result-dest-sublabel').textContent = meta.sublabel;
-    document.getElementById('result-reasoning').textContent =
-      'We could not complete the navigation. Please call 8-1-1 at 1-800-811-2101 for free nurse advice, available 24/7 in BC.';
-    document.getElementById('result-bring-section').style.display = 'none';
-    document.getElementById('result-say-section').style.display = 'none';
-    document.getElementById('result-community-note').style.display = 'none';
-    document.getElementById('result-wait-times').style.display = 'none';
-    document.getElementById('result-healthlink-link').style.display = 'none';
-  }
-
-  /* ── Reset / Start over ── */
-  function resetChat() {
-    chatMessages = [];
-    extractedSymptoms = null;
-    chatMessagesEl.innerHTML = '';
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-    isSending = false;
-    sendBtn.disabled = false;
-    chatInput.disabled = false;
-    addClaudeMessage("Hi, I'm here to help you find the right care. What's going on today?");
-  }
-
-  document.getElementById('btn-start-over').addEventListener('click', function () {
-    extractedSymptoms = null;
-    userLocation = '';
-    resetChat();
-    showScreen('emergency');
-  });
-
-  /* ── Init ── */
-  /* Screen 0 is active by default */
-
-})();
 </script>
 </body>
 </html>

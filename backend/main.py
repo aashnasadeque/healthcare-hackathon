@@ -1,12 +1,6 @@
 """
-BC Care Navigator — FastAPI Backend
-=====================================
-Run with:
-    uvicorn backend.main:app --reload --port 8000
-
-Interactive API docs:
-    http://localhost:8000/docs   (Swagger UI)
-    http://localhost:8000/redoc  (ReDoc)
+Patient Risk Dashboard — FastAPI Backend
+Track 1: Clinical AI | UVic Healthcare Hackathon 2026
 """
 
 import asyncio
@@ -14,144 +8,270 @@ import json
 import os
 import re
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from typing import Optional
 
 import anthropic
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
-from backend.models import (
-    CareDestination,
-    ChatRequest,
-    ChatResponse,
-    CommunityContext,
-    ExtractedSymptoms,
-    HealthCheckResponse,
-    NavigationRequest,
-    NavigationResponse,
-)
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+from pydantic import BaseModel
 
 load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 DATA_DIR = os.getenv("DATA_DIR", "data")
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.0"
 
 # ---------------------------------------------------------------------------
-# Emergency keywords — checked on EVERY user message and symptom list
+# Models
 # ---------------------------------------------------------------------------
 
-EMERGENCY_KEYWORDS = {
-    "chest pain", "chest pressure", "chest tightness", "heart attack",
-    "can't breathe", "cant breathe", "not breathing", "stopped breathing",
-    "face drooping", "arm weakness", "slurred speech", "stroke",
-    "unconscious", "unresponsive", "passed out", "fainted",
-    "seizure", "convulsing",
-    "overdose",
-    "throat closing", "anaphylaxis", "epipen",
-    "purple spots", "meningitis",
-    "severe bleeding", "bleeding won't stop", "coughing blood",
-    "thoughts of suicide", "want to kill myself", "end my life",
-}
+class RiskFlag(BaseModel):
+    label: str
+    severity: str  # "high" | "medium" | "low"
 
-DESTINATION_LABELS = {
-    CareDestination.call_911: "Call 911",
-    CareDestination.go_to_er: "Go to the Emergency Room",
-    CareDestination.upcc: "Urgent and Primary Care Centre (UPCC)",
-    CareDestination.walk_in: "Walk-In Clinic",
-    CareDestination.pharmacist: "Pharmacist",
-    CareDestination.call_811: "Call 8-1-1 (HealthLink BC)",
-    CareDestination.home_care: "Home Care / Self-Care",
-}
+class PatientSummary(BaseModel):
+    patient_id: str
+    first_name: str
+    last_name: str
+    age: int
+    sex: str
+    risk_score: int
+    risk_level: str  # "high" | "medium" | "low"
+    top_flags: list[str]
+    primary_language: str
 
-# Postal code prefix → community name
-POSTAL_CODE_MAP = {
-    "v8w": "Greater Victoria",
-    "v8r": "Saanich",
-    "v5k": "Vancouver",
-    "v6b": "Vancouver",
-    "v2c": "Kamloops",
-    "v1y": "Kelowna",
-    "v2j": "Prince George",
-    "v3l": "Surrey",
-    "v1s": "Salmon Arm",
-    "v0e": "Revelstoke",
-    "v1a": "Golden",
-    "v2a": "Penticton",
-    "v1t": "Vernon",
-    "v2h": "Merritt",
-    "v0n": "Pemberton",
-    "v8g": "Terrace",
-    "v1g": "Dawson Creek",
-    "v0c": "Fort St. John",
-    "v0j": "Fort Nelson",
-    "v2g": "Williams Lake",
-}
+class EncounterItem(BaseModel):
+    encounter_id: str
+    encounter_date: str
+    encounter_type: str
+    facility: str
+    chief_complaint: str
+    diagnosis_description: str
+    triage_level: int
+    disposition: str
+
+class MedicationItem(BaseModel):
+    drug_name: str
+    dosage: str
+    frequency: str
+    prescriber: str
+    start_date: str
+    active: bool
+
+class LabItem(BaseModel):
+    test_name: str
+    value: str
+    unit: str
+    reference_range: str
+    abnormal_flag: str
+    collected_date: str
+
+class VitalsItem(BaseModel):
+    heart_rate: float
+    systolic_bp: float
+    diastolic_bp: float
+    temperature_celsius: float
+    respiratory_rate: float
+    o2_saturation: float
+    pain_scale: float
+    recorded_at: str
+
+class PatientDetail(BaseModel):
+    patient_id: str
+    first_name: str
+    last_name: str
+    date_of_birth: str
+    age: int
+    sex: str
+    postal_code: str
+    primary_language: str
+    blood_type: str
+    risk_score: int
+    risk_level: str
+    flags: list[RiskFlag]
+    ai_summary: str
+    recent_encounters: list[EncounterItem]
+    active_medications: list[MedicationItem]
+    recent_labs: list[LabItem]
+    latest_vitals: Optional[VitalsItem]
+
+class HealthCheckResponse(BaseModel):
+    status: str
+    version: str
 
 # ---------------------------------------------------------------------------
-# App lifecycle — load CSV data on startup
+# Risk scoring — pure Python, no AI
 # ---------------------------------------------------------------------------
 
+def compute_risk(patient_id: str, encounters_df, medications_df, labs_df, vitals_df, age: int) -> tuple[int, list[RiskFlag]]:
+    score = 0
+    flags: list[RiskFlag] = []
+    cutoff = datetime.now() - timedelta(days=365)
+
+    # --- Emergency encounters in last 12 months ---
+    p_enc = encounters_df[encounters_df["patient_id"] == patient_id].copy()
+    p_enc["encounter_date"] = pd.to_datetime(p_enc["encounter_date"], errors="coerce")
+    recent_enc = p_enc[p_enc["encounter_date"] >= cutoff]
+    er_visits = recent_enc[recent_enc["encounter_type"] == "emergency"]
+    if len(er_visits) > 0:
+        score += len(er_visits) * 6
+        flags.append(RiskFlag(label=f"{len(er_visits)} ER visit(s) in past year", severity="high"))
+
+    # High triage level (1 or 2 = most urgent)
+    critical_triage = recent_enc[recent_enc["triage_level"].isin([1, 2])]
+    if len(critical_triage) > 0:
+        score += len(critical_triage) * 3
+        flags.append(RiskFlag(label=f"{len(critical_triage)} critical triage encounter(s)", severity="high"))
+
+    # --- Polypharmacy ---
+    p_meds = medications_df[
+        (medications_df["patient_id"] == patient_id) &
+        (medications_df["active"].astype(str).str.lower() == "true")
+    ]
+    med_count = len(p_meds)
+    if med_count >= 10:
+        score += 10
+        flags.append(RiskFlag(label=f"High polypharmacy: {med_count} active medications", severity="high"))
+    elif med_count >= 5:
+        score += 5
+        flags.append(RiskFlag(label=f"Polypharmacy: {med_count} active medications", severity="medium"))
+
+    # --- Abnormal labs ---
+    p_labs = labs_df[labs_df["patient_id"] == patient_id].copy()
+    p_labs["collected_date"] = pd.to_datetime(p_labs["collected_date"], errors="coerce")
+    recent_labs = p_labs[p_labs["collected_date"] >= cutoff]
+    abnormal_labs = recent_labs[recent_labs["abnormal_flag"].str.upper().isin(["H", "L", "A", "HH", "LL", "Y"])]
+    if len(abnormal_labs) > 0:
+        score += len(abnormal_labs) * 3
+        tests = ", ".join(abnormal_labs["test_name"].unique()[:3])
+        flags.append(RiskFlag(label=f"{len(abnormal_labs)} abnormal lab(s): {tests}", severity="medium"))
+
+    # --- Vitals ---
+    p_vitals = vitals_df[vitals_df["patient_id"] == patient_id].copy()
+    if not p_vitals.empty:
+        p_vitals["recorded_at"] = pd.to_datetime(p_vitals["recorded_at"], errors="coerce")
+        latest = p_vitals.sort_values("recorded_at").iloc[-1]
+        try:
+            o2 = float(latest["o2_saturation"])
+            if o2 < 92:
+                score += 8
+                flags.append(RiskFlag(label=f"Critical O2 sat: {o2}%", severity="high"))
+            elif o2 < 95:
+                score += 4
+                flags.append(RiskFlag(label=f"Low O2 sat: {o2}%", severity="medium"))
+        except (ValueError, TypeError):
+            pass
+        try:
+            sbp = float(latest["systolic_bp"])
+            if sbp >= 180:
+                score += 8
+                flags.append(RiskFlag(label=f"Hypertensive crisis: {sbp} mmHg systolic", severity="high"))
+            elif sbp >= 140:
+                score += 3
+                flags.append(RiskFlag(label=f"High BP: {sbp} mmHg systolic", severity="medium"))
+        except (ValueError, TypeError):
+            pass
+        try:
+            hr = float(latest["heart_rate"])
+            if hr > 120 or hr < 45:
+                score += 6
+                flags.append(RiskFlag(label=f"Abnormal heart rate: {hr} bpm", severity="high"))
+            elif hr > 100 or hr < 55:
+                score += 3
+                flags.append(RiskFlag(label=f"Borderline heart rate: {hr} bpm", severity="medium"))
+        except (ValueError, TypeError):
+            pass
+        try:
+            temp = float(latest["temperature_celsius"])
+            if temp >= 39.5:
+                score += 5
+                flags.append(RiskFlag(label=f"High fever: {temp}°C", severity="high"))
+            elif temp >= 38.5:
+                score += 2
+                flags.append(RiskFlag(label=f"Fever: {temp}°C", severity="medium"))
+        except (ValueError, TypeError):
+            pass
+
+    # --- Age ---
+    if age >= 80:
+        score += 8
+        flags.append(RiskFlag(label="Age 80+: elevated baseline risk", severity="medium"))
+    elif age >= 65:
+        score += 4
+        flags.append(RiskFlag(label="Age 65+: elevated baseline risk", severity="low"))
+
+    return score, flags
+
+
+def risk_level(score: int) -> str:
+    if score >= 20:
+        return "high"
+    elif score >= 10:
+        return "medium"
+    return "low"
+
+
+# ---------------------------------------------------------------------------
+# Startup — precompute risk scores
+# ---------------------------------------------------------------------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load BC health datasets into app.state on startup."""
-    print(f"[startup] BC Care Navigator API v{APP_VERSION}")
+    print(f"[startup] Patient Risk Dashboard v{APP_VERSION}")
 
     try:
-        bc_path = os.path.join(DATA_DIR, "bc_health_indicators.csv")
-        app.state.bc_data = pd.read_csv(bc_path)
-        print(f"[startup] Loaded bc_health_indicators.csv — {len(app.state.bc_data)} rows")
-    except Exception as exc:
-        print(f"[startup] WARNING: Could not load bc_health_indicators.csv: {exc}")
-        app.state.bc_data = pd.DataFrame()
+        patients = pd.read_csv(os.path.join(DATA_DIR, "patients.csv"))
+        encounters = pd.read_csv(os.path.join(DATA_DIR, "encounters.csv"))
+        medications = pd.read_csv(os.path.join(DATA_DIR, "medications.csv"))
+        labs = pd.read_csv(os.path.join(DATA_DIR, "lab_results.csv"))
+        vitals = pd.read_csv(os.path.join(DATA_DIR, "vitals.csv"))
+        print(f"[startup] Loaded: {len(patients)} patients, {len(encounters)} encounters, "
+              f"{len(medications)} medications, {len(labs)} labs, {len(vitals)} vitals")
+    except Exception as e:
+        print(f"[startup] ERROR loading data: {e}")
+        patients = encounters = medications = labs = vitals = pd.DataFrame()
 
-    try:
-        wt_path = os.path.join(DATA_DIR, "wait_times_mock.csv")
-        app.state.wait_times_data = pd.read_csv(wt_path)
-        print(f"[startup] Loaded wait_times_mock.csv — {len(app.state.wait_times_data)} rows")
-    except Exception as exc:
-        print(f"[startup] WARNING: Could not load wait_times_mock.csv: {exc}")
-        app.state.wait_times_data = pd.DataFrame()
+    app.state.patients = patients
+    app.state.encounters = encounters
+    app.state.medications = medications
+    app.state.labs = labs
+    app.state.vitals = vitals
 
-    try:
-        opioid_path = os.path.join(DATA_DIR, "opioid_harms_mock.csv")
-        app.state.opioid_data = pd.read_csv(opioid_path)
-        print(f"[startup] Loaded opioid_harms_mock.csv — {len(app.state.opioid_data)} rows")
-    except Exception as exc:
-        print(f"[startup] WARNING: Could not load opioid_harms_mock.csv: {exc}")
-        app.state.opioid_data = pd.DataFrame()
+    # Precompute risk scores for all patients
+    ranked = []
+    if not patients.empty:
+        for _, row in patients.iterrows():
+            pid = row["patient_id"]
+            age = int(row.get("age", 0))
+            score, flags = compute_risk(pid, encounters, medications, labs, vitals, age)
+            ranked.append({
+                "patient_id": pid,
+                "first_name": str(row.get("first_name", "")),
+                "last_name": str(row.get("last_name", "")),
+                "age": age,
+                "sex": str(row.get("sex", "")),
+                "primary_language": str(row.get("primary_language", "English")),
+                "risk_score": score,
+                "risk_level": risk_level(score),
+                "top_flags": [f.label for f in flags[:3]],
+            })
+        ranked.sort(key=lambda x: x["risk_score"], reverse=True)
+        print(f"[startup] Risk scores computed for {len(ranked)} patients")
 
+    app.state.ranked_patients = ranked
     yield
-    print("[shutdown] BC Care Navigator shutting down.")
+    print("[shutdown] Patient Risk Dashboard shutting down.")
 
 
 # ---------------------------------------------------------------------------
-# App instance
+# App
 # ---------------------------------------------------------------------------
 
-app = FastAPI(
-    title="BC Care Navigator API",
-    description=(
-        "Conversational healthcare navigation for British Columbia. "
-        "Guides patients to the right level of care based on symptoms and location."
-    ),
-    version=APP_VERSION,
-    lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-
-# ---------------------------------------------------------------------------
-# Middleware
-# ---------------------------------------------------------------------------
+app = FastAPI(title="Patient Risk Dashboard", version=APP_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -162,511 +282,194 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# Helper: emergency keyword detection
+# Claude helper
 # ---------------------------------------------------------------------------
 
-
-def _contains_emergency_keyword(text: str) -> bool:
-    """Return True if text contains any emergency keyword as a whole phrase (case-insensitive)."""
-    lower = text.lower()
-    for kw in EMERGENCY_KEYWORDS:
-        # Use word boundaries so "od" can't match inside "body", etc.
-        if re.search(r'\b' + re.escape(kw) + r'\b', lower):
-            return True
-    return False
-
-
-def _any_message_emergency(messages: list) -> bool:
-    """Check all user messages for emergency keywords."""
-    return any(
-        _contains_emergency_keyword(m.content)
-        for m in messages
-        if m.role == "user"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Helper: community lookup (fuzzy match to bc_health_indicators.csv)
-# ---------------------------------------------------------------------------
-
-
-def lookup_community(location: str, bc_data: pd.DataFrame) -> Optional[dict]:
-    """
-    Fuzzy-match a location string to a row in bc_health_indicators.csv.
-    Returns a dict of the matching row, or None if no match found.
-    """
-    if bc_data.empty or not location or location.strip().lower() in ("", "unknown"):
-        return None
-
-    # Normalize the input
-    loc = location.lower().strip()
-    # Strip common suffixes
-    for strip_term in ["bc", "british columbia", ",", "."]:
-        loc = loc.replace(strip_term, "").strip()
-
-    if not loc:
-        return None
-
-    # Check for postal code prefix (first 3 chars)
-    postal_prefix = loc.replace(" ", "")[:3]
-    if postal_prefix in POSTAL_CODE_MAP:
-        loc = POSTAL_CODE_MAP[postal_prefix].lower()
-
-    # Normalise the chsa_name column for comparison
-    names = bc_data["chsa_name"].str.lower().str.strip()
-
-    # 1. Exact match
-    exact = bc_data[names == loc]
-    if not exact.empty:
-        return exact.iloc[0].to_dict()
-
-    # 2. Location is substring of chsa_name
-    sub_fwd = bc_data[names.str.contains(re.escape(loc), na=False)]
-    if not sub_fwd.empty:
-        return sub_fwd.iloc[0].to_dict()
-
-    # 3. chsa_name is substring of location (reverse)
-    matches = bc_data[names.apply(lambda n: n in loc)]
-    if not matches.empty:
-        return matches.iloc[0].to_dict()
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Helper: determine care destination (pure Python rule tree)
-# ---------------------------------------------------------------------------
-
-
-def determine_destination(
-    symptoms: list[str],
-    severity: Optional[str],
-    duration: Optional[str],
-    community: Optional[dict],
-) -> CareDestination:
-    """Rule-based triage tree. Returns a CareDestination enum value."""
-    symptom_set = {s.lower() for s in symptoms}
-    text = " ".join(symptom_set)
-
-    # --- Emergency / ER indicators ---
-    er_terms = {
-        "broken", "fracture", "sepsis", "pregnancy pain", "appendicitis",
-        "severe abdominal", "eye injury", "head injury", "high fever confusion",
-    }
-    if any(t in text for t in er_terms):
-        return CareDestination.go_to_er
-
-    if severity and any(
-        w in severity.lower()
-        for w in ["severe", "very bad", "10", "9", "8", "worst", "unbearable", "now"]
-    ):
-        return CareDestination.go_to_er
-
-    # --- UPCC ---
-    upcc_terms = {
-        "high fever", "fever", "stitches", "wound", "infection", "cellulitis",
-        "mental health", "anxiety", "depression", "panic", "asthma",
-        "breathing difficulty", "moderate pain", "sprain", "burn", "rash",
-        "dehydration",
-    }
-    if any(t in text for t in upcc_terms):
-        return CareDestination.upcc
-
-    # --- Pharmacist (BC expanded scope) ---
-    pharmacist_terms = {
-        "uti", "urinary tract", "pink eye", "conjunctivitis",
-        "refill", "prescription refill", "shingles", "hemorrhoids",
-    }
-    if any(t in text for t in pharmacist_terms):
-        return CareDestination.pharmacist
-
-    # --- Walk-in / equity escalation ---
-    walkin_terms = {
-        "cold", "flu", "ear infection", "sore throat", "cough", "runny nose",
-        "minor pain", "back pain", "headache", "fatigue", "tired", "dizziness",
-        "nausea", "vomiting", "diarrhea", "stomach ache",
-    }
-    if any(t in text for t in walkin_terms):
-        if community and community.get("pct_without_family_doctor", 0) > 25:
-            return CareDestination.upcc  # equity escalation in under-served areas
-        return CareDestination.walk_in
-
-    # --- Duration-based escalation to walk-in ---
-    if duration and any(w in duration.lower() for w in ["week", "month", "long time"]):
-        return CareDestination.walk_in
-
-    return CareDestination.call_811
-
-
-# ---------------------------------------------------------------------------
-# Helper: wait times context string
-# ---------------------------------------------------------------------------
-
-
-def get_wait_times_context(wait_times_data: pd.DataFrame) -> Optional[str]:
-    """
-    Filter BC wait times to the most recent year, compute average median wait,
-    and return a human-readable context string.
-    """
-    try:
-        if wait_times_data.empty:
-            return None
-
-        bc_df = wait_times_data[wait_times_data["province"].str.upper() == "BC"].copy()
-        if bc_df.empty:
-            return None
-
-        most_recent_year = bc_df["year"].max()
-        recent_bc = bc_df[bc_df["year"] == most_recent_year]
-        avg_wait = round(recent_bc["median_wait_days"].mean(), 1)
-
-        return (
-            f"BC's average surgical wait time is {avg_wait} days — "
-            "getting to the right provider now helps prevent longer waits later."
-        )
-    except Exception:
-        return None
-
-
-# ---------------------------------------------------------------------------
-# Helper: call Claude (wrapped for asyncio executor)
-# ---------------------------------------------------------------------------
-
-
-def _call_claude_sync(model: str, system: str, messages: list[dict], max_tokens: int = 1024) -> str:
-    """Synchronous Anthropic SDK call. Run via run_in_executor."""
+def _call_claude_sync(system: str, user: str, max_tokens: int = 400) -> str:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    response = client.messages.create(
-        model=model,
+    resp = client.messages.create(
+        model="claude-haiku-4-5-20251001",
         max_tokens=max_tokens,
         system=system,
-        messages=messages,
+        messages=[{"role": "user", "content": user}],
     )
-    return response.content[0].text
+    return resp.content[0].text
 
 
-async def _call_claude(model: str, system: str, messages: list[dict], max_tokens: int = 1024) -> str:
-    """Async wrapper around synchronous Anthropic SDK."""
+async def _call_claude(system: str, user: str, max_tokens: int = 400) -> str:
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        None,
-        lambda: _call_claude_sync(model, system, messages, max_tokens),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Chat system prompt
-# ---------------------------------------------------------------------------
-
-CHAT_SYSTEM_PROMPT = """You are a friendly BC healthcare navigation assistant. Your job is to help people figure out where to go for care — not to diagnose them.
-
-RULES:
-- Speak at a grade 6 reading level. Be warm, calm, and reassuring.
-- NEVER diagnose. NEVER say "you have X". NEVER recommend specific medications.
-- Ask about: what is happening, how long it has been going on, how bad it feels (1-10), and where in the body.
-- After 3-4 exchanges where you have gathered enough information, respond with ONLY a JSON object — nothing else.
-- If you do not yet have enough information, respond with ONLY your next question as plain text — no JSON.
-
-WHEN YOU HAVE ENOUGH INFO, respond with ONLY this JSON (no extra text):
-{
-  "ready": true,
-  "symptoms": ["symptom1", "symptom2"],
-  "duration": "e.g. 2 days",
-  "severity": "e.g. moderate, 6/10",
-  "plain_descriptions": [
-    {"patient_words": "my tummy hurts", "clinical_term": "abdominal pain"},
-    {"patient_words": "I feel dizzy", "clinical_term": "dizziness"}
-  ]
-}
-
-IMPORTANT: Only output the JSON when you are confident you have: what symptoms, how long, how severe. Otherwise ask your next question."""
+    return await loop.run_in_executor(None, lambda: _call_claude_sync(system, user, max_tokens))
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
-
-@app.get(
-    "/health",
-    response_model=HealthCheckResponse,
-    tags=["Meta"],
-    summary="Health check",
-)
-async def health_check() -> HealthCheckResponse:
-    """Liveness probe — returns 200 if the service is up."""
-    return HealthCheckResponse(
-        status="ok",
-        version=APP_VERSION,
-        message="BC Care Navigator API is running.",
-    )
+@app.get("/health", response_model=HealthCheckResponse)
+async def health():
+    return HealthCheckResponse(status="ok", version=APP_VERSION)
 
 
-@app.post(
-    "/api/chat",
-    response_model=ChatResponse,
-    tags=["Chat"],
-    summary="Conversational symptom collection",
-)
-async def chat(request: ChatRequest) -> ChatResponse:
-    """
-    Accepts conversation history and returns the next assistant message.
-    Detects emergencies immediately. When enough info is gathered, returns
-    extracted symptoms ready for navigation.
-    """
-    # 1. Emergency keyword check across ALL user messages
-    if _any_message_emergency(request.messages):
-        return ChatResponse(
-            reply=(
-                "This sounds like a medical emergency. "
-                "Please call 9-1-1 immediately or have someone take you to the nearest Emergency Room right away. "
-                "Do not drive yourself. Stay on the line with 9-1-1 — they will help you."
-            ),
-            is_emergency=True,
-            ready_for_review=False,
+@app.get("/api/patients", response_model=list[PatientSummary])
+async def get_patients(limit: int = 50, search: str = ""):
+    ranked = app.state.ranked_patients
+    if search:
+        s = search.lower()
+        ranked = [p for p in ranked if s in p["first_name"].lower() or s in p["last_name"].lower() or s in p["patient_id"].lower()]
+    return [PatientSummary(**p) for p in ranked[:limit]]
+
+
+@app.get("/api/patient/{patient_id}", response_model=PatientDetail)
+async def get_patient(patient_id: str):
+    patients_df = app.state.patients
+    encounters_df = app.state.encounters
+    medications_df = app.state.medications
+    labs_df = app.state.labs
+    vitals_df = app.state.vitals
+
+    # Find patient row
+    p_rows = patients_df[patients_df["patient_id"] == patient_id]
+    if p_rows.empty:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    p = p_rows.iloc[0]
+    age = int(p.get("age", 0))
+
+    # Recompute risk (already cached but we need flags too)
+    score, flags = compute_risk(patient_id, encounters_df, medications_df, labs_df, vitals_df, age)
+
+    # Recent encounters (last 10)
+    p_enc = encounters_df[encounters_df["patient_id"] == patient_id].copy()
+    p_enc["encounter_date"] = pd.to_datetime(p_enc["encounter_date"], errors="coerce")
+    p_enc = p_enc.sort_values("encounter_date", ascending=False).head(10)
+    recent_encounters = [
+        EncounterItem(
+            encounter_id=str(r["encounter_id"]),
+            encounter_date=str(r["encounter_date"])[:10],
+            encounter_type=str(r["encounter_type"]),
+            facility=str(r["facility"]),
+            chief_complaint=str(r["chief_complaint"]),
+            diagnosis_description=str(r["diagnosis_description"]),
+            triage_level=int(r["triage_level"]) if pd.notna(r["triage_level"]) else 5,
+            disposition=str(r["disposition"]),
         )
-
-    # 2. Build messages list for Claude
-    claude_messages = [
-        {"role": m.role, "content": m.content}
-        for m in request.messages
+        for _, r in p_enc.iterrows()
     ]
 
-    # 3. Call Claude claude-sonnet-4-6
-    try:
-        raw_reply = await _call_claude(
-            model="claude-sonnet-4-6",
-            system=CHAT_SYSTEM_PROMPT,
-            messages=claude_messages,
-            max_tokens=512,
-        )
-    except Exception as exc:
-        print(f"[chat] Claude call failed: {exc}")
-        return ChatResponse(
-            reply=(
-                "I want to make sure I understand what you're going through. "
-                "Can you tell me a bit more — where in your body does it hurt, "
-                "how long has this been going on, and how bad would you say it feels from 1 to 10?"
-            ),
-            ready_for_review=False,
-            is_emergency=False,
-        )
-
-    # 4. Try to parse as JSON with "ready": true
-    stripped = raw_reply.strip()
-    # Extract JSON block if Claude wrapped it in markdown fences
-    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", stripped, re.DOTALL)
-    if json_match:
-        stripped = json_match.group(1)
-
-    extracted_symptoms = None
-    ready = False
-
-    if stripped.startswith("{"):
-        try:
-            parsed = json.loads(stripped)
-            if parsed.get("ready") is True:
-                ready = True
-                extracted_symptoms = ExtractedSymptoms(
-                    symptoms=parsed.get("symptoms", []),
-                    duration=parsed.get("duration"),
-                    severity=parsed.get("severity"),
-                    plain_descriptions=parsed.get("plain_descriptions", []),
-                )
-                # Build a friendly bridging message
-                raw_reply = (
-                    "Thanks for sharing that with me. I have enough information now. "
-                    "Let me find the best place for you to get care."
-                )
-        except (json.JSONDecodeError, Exception) as exc:
-            print(f"[chat] JSON parse failed: {exc}")
-            # Fall through — treat as plain text reply
-
-    return ChatResponse(
-        reply=raw_reply,
-        ready_for_review=ready,
-        extracted_symptoms=extracted_symptoms,
-        is_emergency=False,
-    )
-
-
-@app.post(
-    "/api/navigate",
-    response_model=NavigationResponse,
-    tags=["Navigation"],
-    summary="Determine care destination and generate guidance",
-)
-async def navigate(request: NavigationRequest) -> NavigationResponse:
-    """
-    Takes extracted symptoms and location, applies the triage rule tree,
-    then calls Claude Haiku to generate a patient-friendly navigation response.
-    """
-    symptoms = request.extracted_symptoms.symptoms
-    severity = request.extracted_symptoms.severity
-    duration = request.extracted_symptoms.duration
-    location = request.location
-
-    # 1. Emergency keyword check in symptom list
-    symptom_text = " ".join(symptoms)
-    if _contains_emergency_keyword(symptom_text):
-        return NavigationResponse(
-            destination=CareDestination.call_911,
-            destination_label=DESTINATION_LABELS[CareDestination.call_911],
-            is_emergency=True,
-            headline="Call 9-1-1 Now",
-            reasoning=(
-                "Your symptoms may be life-threatening. "
-                "Emergency services can provide the fastest and safest care."
-            ),
-            what_to_bring=["Your health card (if available)", "A list of any medications you take"],
-            what_to_say=["I am having a medical emergency", "My symptoms are: " + symptom_text],
-            community_note=None,
-            community_context=None,
-            safety_triggered=True,
-            wait_times_context=None,
-        )
-
-    # 2. Lookup community data
-    bc_data = app.state.bc_data
-    community = lookup_community(location, bc_data)
-
-    # 3. Rule-based destination
-    destination = determine_destination(symptoms, severity, duration, community)
-
-    # 4. Wait times context
-    wait_times_context = get_wait_times_context(app.state.wait_times_data)
-
-    # 5. Build community context model (if matched)
-    community_context_model = None
-    if community:
-        try:
-            community_context_model = CommunityContext(
-                chsa_name=str(community.get("chsa_name", "")),
-                health_authority=str(community.get("health_authority", "")),
-                pct_without_family_doctor=float(community.get("pct_without_family_doctor", 0)),
-                er_visits_per_1000=float(community.get("er_visits_per_1000", 0)),
-                opioid_overdose_rate=float(community.get("opioid_overdose_rate", 0)),
-                pct_below_poverty_line=float(community.get("pct_below_poverty_line", 0)),
-            )
-        except Exception as exc:
-            print(f"[navigate] Could not build CommunityContext: {exc}")
-
-    # 6. Call Claude Haiku for patient-friendly guidance
-    destination_label = DESTINATION_LABELS.get(destination, str(destination))
-    community_info = ""
-    if community:
-        community_info = (
-            f"\nCommunity context: {community.get('chsa_name', 'unknown')} "
-            f"({community.get('health_authority', '')}). "
-            f"{community.get('pct_without_family_doctor', 'N/A')}% without a family doctor. "
-            f"ER visits: {community.get('er_visits_per_1000', 'N/A')} per 1,000 residents."
-        )
-
-    haiku_system = (
-        "You are a BC healthcare navigation assistant. "
-        "You have already decided where the patient should go. "
-        "Your job is to write warm, clear, grade-6-level guidance to help them. "
-        "Return ONLY a valid JSON object with these exact keys: "
-        "headline (short, action-oriented, max 10 words), "
-        "reasoning (2-3 sentences explaining why this destination), "
-        "what_to_bring (list of 3-5 strings), "
-        "what_to_say (list of 2-4 strings — exact phrases for the patient to use), "
-        "community_note (1 sentence about local context, or null). "
-        "Do not include any text outside the JSON."
-    )
-
-    haiku_user = (
-        f"Patient symptoms: {', '.join(symptoms)}\n"
-        f"Duration: {duration or 'unknown'}\n"
-        f"Severity: {severity or 'unknown'}\n"
-        f"Decided destination: {destination_label}\n"
-        f"Location: {location}{community_info}\n\n"
-        "Generate the patient guidance JSON now."
-    )
-
-    # Sensible defaults in case Claude fails
-    default_headline = f"Go to: {destination_label}"
-    default_reasoning = (
-        f"Based on your symptoms, {destination_label} is the most appropriate level of care for you right now."
-    )
-    default_what_to_bring = [
-        "Your BC Services Card or health card",
-        "A list of any medications you are taking",
-        "A trusted friend or family member if possible",
+    # Active medications
+    p_meds = medications_df[
+        (medications_df["patient_id"] == patient_id) &
+        (medications_df["active"].astype(str).str.lower() == "true")
     ]
-    default_what_to_say = [
-        f"I was advised to come here by BC Care Navigator",
-        f"My main symptoms are: {', '.join(symptoms[:3])}",
-        f"This has been going on for: {duration or 'some time'}",
+    active_medications = [
+        MedicationItem(
+            drug_name=str(r["drug_name"]),
+            dosage=str(r["dosage"]),
+            frequency=str(r["frequency"]),
+            prescriber=str(r["prescriber"]),
+            start_date=str(r["start_date"]),
+            active=True,
+        )
+        for _, r in p_meds.iterrows()
     ]
 
-    headline = default_headline
-    reasoning = default_reasoning
-    what_to_bring = default_what_to_bring
-    what_to_say = default_what_to_say
-    community_note = None
+    # Recent labs (last 15, sorted by date)
+    p_labs = labs_df[labs_df["patient_id"] == patient_id].copy()
+    p_labs["collected_date"] = pd.to_datetime(p_labs["collected_date"], errors="coerce")
+    p_labs = p_labs.sort_values("collected_date", ascending=False).head(15)
+    recent_labs = [
+        LabItem(
+            test_name=str(r["test_name"]),
+            value=str(r["value"]),
+            unit=str(r["unit"]),
+            reference_range=f"{r['reference_range_low']}–{r['reference_range_high']}",
+            abnormal_flag=str(r["abnormal_flag"]),
+            collected_date=str(r["collected_date"])[:10],
+        )
+        for _, r in p_labs.iterrows()
+    ]
+
+    # Latest vitals
+    latest_vitals = None
+    p_vitals = vitals_df[vitals_df["patient_id"] == patient_id].copy()
+    if not p_vitals.empty:
+        p_vitals["recorded_at"] = pd.to_datetime(p_vitals["recorded_at"], errors="coerce")
+        lv = p_vitals.sort_values("recorded_at").iloc[-1]
+        latest_vitals = VitalsItem(
+            heart_rate=float(lv["heart_rate"]),
+            systolic_bp=float(lv["systolic_bp"]),
+            diastolic_bp=float(lv["diastolic_bp"]),
+            temperature_celsius=float(lv["temperature_celsius"]),
+            respiratory_rate=float(lv["respiratory_rate"]),
+            o2_saturation=float(lv["o2_saturation"]),
+            pain_scale=float(lv["pain_scale"]),
+            recorded_at=str(lv["recorded_at"]),
+        )
+
+    # AI clinical summary
+    flag_text = "; ".join([f.label for f in flags]) if flags else "No critical flags"
+    med_list = ", ".join([m.drug_name for m in active_medications[:8]]) or "none"
+    recent_dx = ", ".join([e.diagnosis_description for e in recent_encounters[:3]]) or "none"
+    vitals_text = ""
+    if latest_vitals:
+        vitals_text = (f"Latest vitals: HR {latest_vitals.heart_rate}, "
+                       f"BP {latest_vitals.systolic_bp}/{latest_vitals.diastolic_bp}, "
+                       f"O2 {latest_vitals.o2_saturation}%, Temp {latest_vitals.temperature_celsius}°C")
+
+    ai_system = (
+        "You are a clinical decision support assistant. Write a concise 3-sentence clinical summary "
+        "for a clinician reviewing this patient. Focus on: (1) key risk factors, (2) what needs attention now, "
+        "(3) one suggested next step. Be specific, clinical, and direct. Do not diagnose. Plain text only, no markdown."
+    )
+    ai_user = (
+        f"Patient: {p['first_name']} {p['last_name']}, {age}yo {p['sex']}\n"
+        f"Risk score: {score} ({risk_level(score)})\n"
+        f"Risk flags: {flag_text}\n"
+        f"Active medications ({len(active_medications)}): {med_list}\n"
+        f"Recent diagnoses: {recent_dx}\n"
+        f"{vitals_text}\n\n"
+        "Write the 3-sentence clinical summary now."
+    )
 
     try:
-        haiku_reply = await _call_claude(
-            model="claude-haiku-4-5-20251001",
-            system=haiku_system,
-            messages=[{"role": "user", "content": haiku_user}],
-            max_tokens=600,
+        ai_summary = await _call_claude(ai_system, ai_user, max_tokens=300)
+    except Exception as e:
+        print(f"[patient] Claude failed: {e}")
+        ai_summary = (
+            f"{p['first_name']} {p['last_name']} has a risk score of {score} ({risk_level(score)} risk). "
+            f"Key concerns: {flag_text}. "
+            f"Review active medications and recent encounters for follow-up."
         )
 
-        # Strip markdown fences if present
-        haiku_stripped = haiku_reply.strip()
-        fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", haiku_stripped, re.DOTALL)
-        if fence_match:
-            haiku_stripped = fence_match.group(1)
-
-        haiku_json = json.loads(haiku_stripped)
-        headline = haiku_json.get("headline", default_headline)
-        reasoning = haiku_json.get("reasoning", default_reasoning)
-        raw_bring = haiku_json.get("what_to_bring", default_what_to_bring)
-        raw_say = haiku_json.get("what_to_say", default_what_to_say)
-        community_note = haiku_json.get("community_note") or None
-
-        # Ensure lists of strings
-        what_to_bring = [str(item) for item in raw_bring] if isinstance(raw_bring, list) else default_what_to_bring
-        what_to_say = [str(item) for item in raw_say] if isinstance(raw_say, list) else default_what_to_say
-
-    except Exception as exc:
-        print(f"[navigate] Claude Haiku call failed or parse error: {exc}. Using defaults.")
-
-    return NavigationResponse(
-        destination=destination,
-        destination_label=destination_label,
-        is_emergency=False,
-        headline=headline,
-        reasoning=reasoning,
-        what_to_bring=what_to_bring,
-        what_to_say=what_to_say,
-        community_note=community_note,
-        community_context=community_context_model,
-        safety_triggered=False,
-        wait_times_context=wait_times_context,
+    return PatientDetail(
+        patient_id=patient_id,
+        first_name=str(p["first_name"]),
+        last_name=str(p["last_name"]),
+        date_of_birth=str(p["date_of_birth"]),
+        age=age,
+        sex=str(p["sex"]),
+        postal_code=str(p["postal_code"]),
+        primary_language=str(p["primary_language"]),
+        blood_type=str(p["blood_type"]),
+        risk_score=score,
+        risk_level=risk_level(score),
+        flags=flags,
+        ai_summary=ai_summary,
+        recent_encounters=recent_encounters,
+        active_medications=active_medications,
+        recent_labs=recent_labs,
+        latest_vitals=latest_vitals,
     )
 
 
 # ---------------------------------------------------------------------------
-# Static files — mount frontend AFTER all API routes
+# Static files
 # ---------------------------------------------------------------------------
 
 _frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 if os.path.isdir(_frontend_dir):
     app.mount("/", StaticFiles(directory=_frontend_dir, html=True), name="frontend")
-else:
-    print(f"[startup] WARNING: frontend directory not found at {_frontend_dir}")
-
-
-# ---------------------------------------------------------------------------
-# Dev entrypoint
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     import uvicorn
-
     PORT = int(os.getenv("PORT", "8000"))
-    DEBUG = os.getenv("DEBUG", "true").lower() == "true"
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=PORT, reload=DEBUG)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=PORT, reload=True)
