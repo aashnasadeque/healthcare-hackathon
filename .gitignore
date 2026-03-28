@@ -1,0 +1,142 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+*.manifest
+*.spec
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# mypy / type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# =============================================================================
+# Jupyter Notebooks
+# =============================================================================
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+# Uncomment to ignore notebook outputs (recommended for PHI safety):
+# *.ipynb
+
+# =============================================================================
+# Node / Frontend
+# =============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+.npm
+.yarn-integrity
+dist/
+.next/
+out/
+.nuxt/
+.cache/
+.parcel-cache/
+
+# =============================================================================
+# Environment & Secrets — NEVER COMMIT THESE
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+credentials/
+
+# =============================================================================
+# Data Files — Keep data out of git (especially PHI)
+# =============================================================================
+data/*
+!data/.gitkeep
+
+# Flat data files anywhere in the project
+*.csv
+*.xlsx
+*.xls
+*.tsv
+*.parquet
+*.feather
+*.arrow
+*.h5
+*.hdf5
+*.db
+*.sqlite
+*.sqlite3
+
+# Large JSON (keep small config JSON in git, ignore data dumps)
+*_data.json
+*_export.json
+*_dump.json
+
+# =============================================================================
+# ML Model Artifacts
+# =============================================================================
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+*.pt
+*.pth
+*.h5
+models/saved/
+
+# =============================================================================
+# IDEs & OS
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# Logs
+# =============================================================================
+*.log
+logs/

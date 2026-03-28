@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Healthcare Hackathon — Patient Risk Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #2b6cb0;
+    }
+
+    header p {
+      margin-top: 0.4rem;
+      color: #4a5568;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 2rem;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.2rem;
+      color: #2d3748;
+      border-bottom: 2px solid #ebf4ff;
+      padding-bottom: 0.5rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input, select, textarea {
+      padding: 0.55rem 0.75rem;
+      border: 1px solid #cbd5e0;
+      border-radius: 7px;
+      font-size: 0.95rem;
+      color: #2d3748;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: #f7fafc;
+      width: 100%;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #4299e1;
+      box-shadow: 0 0 0 3px rgba(66,153,225,0.2);
+      background: #fff;
+    }
+
+    textarea { resize: vertical; min-height: 70px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-primary {
+      background: #2b6cb0;
+      color: #fff;
+      width: 100%;
+      margin-top: 1.2rem;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: #2c5282; }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* Result card */
+    #result-card { display: none; }
+
+    .risk-badge {
+      display: inline-block;
+      padding: 0.3rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .risk-low    { background: #c6f6d5; color: #276749; }
+    .risk-moderate { background: #fefcbf; color: #744210; }
+    .risk-high   { background: #fed7d7; color: #742a2a; }
+
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .score-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #2b6cb0;
+      line-height: 1;
+    }
+
+    .score-bar-wrap {
+      flex: 1;
+      background: #e2e8f0;
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .score-bar {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.6s ease;
+    }
+
+    .bar-low      { background: #48bb78; }
+    .bar-moderate { background: #ecc94b; }
+    .bar-high     { background: #fc8181; }
+
+    .flags-list, .recs-list {
+      list-style: none;
+      margin-top: 0.5rem;
+    }
+
+    .flags-list li::before { content: '⚠ '; color: #dd6b20; }
+    .recs-list  li::before { content: '→ '; color: #3182ce; }
+
+    .flags-list li, .recs-list li {
+      padding: 0.3rem 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid #f7fafc;
+      color: #4a5568;
+    }
+
+    .empty-list { color: #a0aec0; font-style: italic; font-size: 0.9rem; }
+
+    /* Error state */
+    .error-box {
+      background: #fff5f5;
+      border: 1px solid #fc8181;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #c53030;
+      font-size: 0.9rem;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer {
+      margin-top: 1rem;
+      font-size: 0.78rem;
+      color: #a0aec0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Patient Risk Analyzer</h1>
+    <p>Submit patient vitals and labs to receive a real-time risk assessment.</p>
+  </header>
+
+  <!-- Input Form -->
+  <div class="card">
+    <h2>Patient Data</h2>
+    <form id="patient-form" novalidate>
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label for="patient_id">Patient ID *</label>
+          <input type="text" id="patient_id" placeholder="PT-00123" required />
+        </div>
+
+        <div class="form-group">
+          <label for="age">Age (years)</label>
+          <input type="number" id="age" placeholder="65" min="0" max="150" />
+        </div>
+
+        <div class="form-group">
+          <label for="sex">Sex</label>
+          <select id="sex">
+            <option value="">— select —</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="heart_rate">Heart Rate (bpm)</label>
+          <input type="number" id="heart_rate" placeholder="72" min="0" max="350" />
+        </div>
+
+        <div class="form-group">
+          <label for="systolic_bp">Systolic BP (mmHg)</label>
+          <input type="number" id="systolic_bp" placeholder="120" />
+        </div>
+
+        <div class="form-group">
+          <label for="diastolic_bp">Diastolic BP (mmHg)</label>
+          <input type="number" id="diastolic_bp" placeholder="80" />
+        </div>
+
+        <div class="form-group">
+          <label for="spo2">SpO2 (%)</label>
+          <input type="number" id="spo2" placeholder="98" min="0" max="100" step="0.1" />
+        </div>
+
+        <div class="form-group">
+          <label for="temperature_c">Temperature (°C)</label>
+          <input type="number" id="temperature_c" placeholder="37.0" step="0.1" />
+        </div>
+
+        <div class="form-group">
+          <label for="weight_kg">Weight (kg)</label>
+          <input type="number" id="weight_kg" placeholder="70" step="0.1" />
+        </div>
+
+        <div class="form-group">
+          <label for="height_cm">Height (cm)</label>
+          <input type="number" id="height_cm" placeholder="170" />
+        </div>
+
+        <div class="form-group full-width">
+          <label for="chief_complaint">Chief Complaint</label>
+          <textarea id="chief_complaint" placeholder="Brief description of the presenting problem..."></textarea>
+        </div>
+
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        <span class="spinner" id="spinner"></span>
+        <span id="btn-label">Analyze Patient</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Result -->
+  <div class="card" id="result-card">
+    <h2>Analysis Result</h2>
+    <div id="result-content"></div>
+  </div>
+
+  <footer>
+    API: <code id="api-url-display"></code> &nbsp;|&nbsp; For demo purposes only — not a clinical tool.
+  </footer>
+
+<script>
+  // ── Configuration ──────────────────────────────────────────────────────────
+  const API_BASE = 'http://localhost:8000';
+  const ANALYZE_URL = `${API_BASE}/api/analyze`;
+  document.getElementById('api-url-display').textContent = ANALYZE_URL;
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function numOrNull(id) {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : Number(v);
+  }
+
+  function strOrNull(id) {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : v;
+  }
+
+  function buildPayload() {
+    const vitals = {
+      heart_rate:      numOrNull('heart_rate'),
+      systolic_bp:     numOrNull('systolic_bp'),
+      diastolic_bp:    numOrNull('diastolic_bp'),
+      spo2:            numOrNull('spo2'),
+      temperature_c:   numOrNull('temperature_c'),
+      weight_kg:       numOrNull('weight_kg'),
+      height_cm:       numOrNull('height_cm'),
+    };
+
+    // Only include vitals object if at least one field is set
+    const hasVitals = Object.values(vitals).some(v => v !== null);
+
+    return {
+      patient_id:      document.getElementById('patient_id').value.trim(),
+      age:             numOrNull('age'),
+      sex:             strOrNull('sex'),
+      vitals:          hasVitals ? vitals : null,
+      labs:            [],
+      diagnoses:       [],
+      chief_complaint: strOrNull('chief_complaint'),
+    };
+  }
+
+  function setLoading(loading) {
+    const btn    = document.getElementById('submit-btn');
+    const spin   = document.getElementById('spinner');
+    const label  = document.getElementById('btn-label');
+    btn.disabled = loading;
+    spin.style.display  = loading ? 'block' : 'none';
+    label.textContent   = loading ? 'Analyzing…' : 'Analyze Patient';
+  }
+
+  function renderResult(data) {
+    const riskClass = `risk-${data.risk_label}`;
+    const barClass  = `bar-${data.risk_label}`;
+    const scorePct  = (data.risk_score * 100).toFixed(1);
+
+    const flagsHtml = data.flags.length
+      ? data.flags.map(f => `<li>${f}</li>`).join('')
+      : '<span class="empty-list">No clinical flags raised.</span>';
+
+    const recsHtml = data.recommendations.length
+      ? data.recommendations.map(r => `<li>${r}</li>`).join('')
+      : '<span class="empty-list">No specific recommendations.</span>';
+
+    return `
+      <div class="score-row">
+        <div class="score-number">${scorePct}%</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar ${barClass}" style="width: ${scorePct}%"></div>
+        </div>
+        <span class="risk-badge ${riskClass}">${data.risk_label}</span>
+      </div>
+
+      <p style="font-size:0.85rem;color:#718096;margin-bottom:1rem;">
+        Patient&nbsp;<strong>${data.patient_id}</strong> &nbsp;|&nbsp;
+        Model&nbsp;v${data.model_version}
+      </p>
+
+      <h3 style="font-size:0.95rem;font-weight:600;margin-bottom:0.3rem;">Clinical Flags</h3>
+      <ul class="flags-list">${flagsHtml}</ul>
+
+      <h3 style="font-size:0.95rem;font-weight:600;margin:0.9rem 0 0.3rem;">Recommendations</h3>
+      <ul class="recs-list">${recsHtml}</ul>
+    `;
+  }
+
+  function renderError(message) {
+    return `<div class="error-box">${message}</div>`;
+  }
+
+  // ── Form submit ────────────────────────────────────────────────────────────
+
+  document.getElementById('patient-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const patientId = document.getElementById('patient_id').value.trim();
+    if (!patientId) {
+      alert('Patient ID is required.');
+      document.getElementById('patient_id').focus();
+      return;
+    }
+
+    const payload = buildPayload();
+    const resultCard    = document.getElementById('result-card');
+    const resultContent = document.getElementById('result-content');
+
+    setLoading(true);
+    resultCard.style.display = 'none';
+
+    try {
+      const response = await fetch(ANALYZE_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const detail  = errData.detail || `HTTP ${response.status} ${response.statusText}`;
+        resultContent.innerHTML = renderError(`API error: ${detail}`);
+      } else {
+        const data = await response.json();
+        resultContent.innerHTML = renderResult(data);
+      }
+    } catch (err) {
+      const msg = err.message.includes('fetch')
+        ? `Could not reach the API at <code>${ANALYZE_URL}</code>. Make sure the backend is running:<br><code>uvicorn backend.main:app --reload</code>`
+        : err.message;
+      resultContent.innerHTML = renderError(msg);
+    } finally {
+      setLoading(false);
+      resultCard.style.display = 'block';
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+</script>
+</body>
+</html>
