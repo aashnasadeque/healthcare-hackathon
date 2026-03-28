@@ -440,8 +440,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
         print(f"[chat] Claude call failed: {exc}")
         return ChatResponse(
             reply=(
-                "I'm having a little trouble right now. "
-                "Can you tell me more about what you're feeling and how long it has been going on?"
+                "I want to make sure I understand what you're going through. "
+                "Can you tell me a bit more — where in your body does it hurt, "
+                "how long has this been going on, and how bad would you say it feels from 1 to 10?"
             ),
             ready_for_review=False,
             is_emergency=False,
