@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bc-care-navigator
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATA_DIR
+        value: data
+      - key: DEBUG
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        value: "*"

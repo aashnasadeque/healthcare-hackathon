@@ -87,13 +87,12 @@ secrets/
 credentials/
 
 # =============================================================================
-# Data Files — Keep data out of git (especially PHI)
+# Data Files
 # =============================================================================
-data/*
-!data/.gitkeep
+# NOTE: data/*.csv files are committed intentionally — BC synthetic health
+# data, no PHI. Do NOT add data/ or *.csv to this gitignore.
 
-# Flat data files anywhere in the project
-*.csv
+# Binary / large data formats
 *.xlsx
 *.xls
 *.tsv
@@ -106,7 +105,7 @@ data/*
 *.sqlite
 *.sqlite3
 
-# Large JSON (keep small config JSON in git, ignore data dumps)
+# Large JSON data dumps (keep small config JSON in git)
 *_data.json
 *_export.json
 *_dump.json

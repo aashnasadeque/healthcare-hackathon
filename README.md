@@ -1,109 +1,55 @@
-# Healthcare Hackathon Project
+# BC Care Navigator
 
-A health informatics project built for rapid prototyping with real patient data pipelines, FHIR integration, and ML-ready analysis.
+**UVic Healthcare AI Hackathon 2026 — Track 2: Population Health & Health Equity**
 
----
+## The Problem
+People in BC don't know where to go for care. They default to the ER — 8-10 hour waits — for conditions that could be handled at a walk-in clinic, UPCC, or pharmacy. In communities where 25%+ of residents have no family doctor, this problem is even worse.
 
-## Problem
+## The Solution
+A conversational care navigation tool. Patients describe their symptoms in plain language. The AI asks follow-up questions. Patients review a plain/clinical interpretation. Then they get one clear answer: where to go, why, what to bring, and what to say.
 
-> **TODO:** Describe the clinical or operational problem you are solving.
->
-> Example: _"Emergency departments lack real-time tools to triage patient risk, leading to delayed care for high-acuity patients."_
-
----
-
-## Solution
-
-> **TODO:** Describe your approach.
->
-> Example: _"A lightweight risk-scoring API that ingests structured patient data (vitals, diagnoses, labs) and returns an acuity score with explainable features — deployable in any EHR workflow via FHIR R4."_
-
-Key components:
-- **Backend:** FastAPI REST API with a `/api/analyze` endpoint for patient data scoring
-- **Data layer:** Pandas-based pipeline for EHR/CSV/FHIR data ingestion
-- **ML:** scikit-learn models for risk stratification
-- **Frontend:** Zero-dependency HTML/JS interface for demo purposes
-- **Notebooks:** Jupyter EDA and model prototyping
-
----
-
-## Setup
-
-### Prerequisites
-- Python 3.10+
-- Node.js (optional, for frontend tooling)
-
-### Backend
-
-```bash
-# Clone and enter the repo
-git clone <your-repo-url>
-cd healthcare-hackathon
-
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your values
-
-# Run the API
-uvicorn backend.main:app --reload --port 8000
-```
-
-API docs will be available at: http://localhost:8000/docs
-
-### Frontend
-
-Open `frontend/index.html` directly in a browser. The page will POST to `http://localhost:8000/api/analyze`.
-
-### Notebooks
-
-```bash
-jupyter notebook notebooks/exploration.ipynb
-```
-
-### Data
-
-Place raw data files in the `data/` directory. The directory is git-ignored for large files — do not commit PHI or patient data.
-
----
+**Backed by BC community health data** — communities with fewer healthcare resources get recommendations that reflect their actual options.
 
 ## Team
+- Aashna Sadeque
 
-| Name | Role | Contact |
-|------|------|---------|
-| TODO | Lead Developer | |
-| TODO | Data Scientist | |
-| TODO | Clinician Advisor | |
-| TODO | UX / Frontend | |
+## Challenge Track
+Track 2: Population Health & Health Equity
 
----
+## Data Sources
+- BC Community Health Indicators (78 BC communities)
+- CIHI Wait Times (BC surgical wait time context)
+- BC Opioid Surveillance Data
 
-## Project Structure
+## Tech Stack
+- **Backend**: Python, FastAPI
+- **AI**: Claude API (Anthropic)
+- **Data**: pandas, BC open health datasets
+- **Frontend**: Vanilla HTML/CSS/JS (mobile-first)
+- **Deployment**: Render
 
+## Live Demo
+[Add URL after deployment]
+
+## Problem Statement
+BC residents without a family doctor have no clear pathway to specialist care. They default to emergency rooms for non-emergencies, contributing to 8-10 hour wait times. This tool uses BC population health data to route patients to the right level of care — accounting for their community's specific access gaps.
+
+## How to Run Locally
+```bash
+git clone https://github.com/aashnasadeque/healthcare-hackathon
+cd healthcare-hackathon
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# Add your ANTHROPIC_API_KEY to .env
+uvicorn backend.main:app --reload
+# Open http://localhost:8000
 ```
-healthcare-hackathon/
-├── backend/
-│   ├── main.py          # FastAPI application entrypoint
-│   ├── models.py        # Pydantic request/response models
-│   └── routes/          # Route modules (add new endpoints here)
-├── data/                # Raw and processed data (git-ignored)
-├── notebooks/
-│   └── exploration.ipynb  # EDA and prototyping
-├── frontend/
-│   └── index.html       # Demo UI
-├── .env.example         # Environment variable template
-├── requirements.txt     # Python dependencies
-└── README.md
-```
 
----
-
-## License
-
-MIT — see LICENSE file. **Do not commit any PHI (Protected Health Information).**
+## How Judging Criteria Are Met
+- **Innovation**: Conversational triage with plain/clinical review screen — novel in BC healthcare navigation
+- **Technical Execution**: FastAPI + Claude API + BC community data, live deployment
+- **Impact Potential**: Directly reduces ER misuse, routes unattached patients to UPCCs that can write specialist referrals
+- **Presentation**: Mobile-first, plain language, designed for real patients
+- **Design/UX**: Single clear recommendation, color-coded, accessible
