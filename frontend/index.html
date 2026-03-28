@@ -913,7 +913,7 @@
     <div class="emergency-actions">
       <a href="tel:911" class="btn btn-red" aria-label="Call 911 for emergency">Call 911</a>
       <a href="tel:988" class="btn btn-outline" aria-label="Call 9-8-8 for mental health crisis">Mental health crisis — Call 9-8-8</a>
-      <button class="btn btn-ghost" id="btn-not-emergency">None of these apply — continue</button>
+      <button class="btn btn-outline" id="btn-not-emergency">None of these apply — continue</button>
     </div>
   </main>
 
@@ -1447,8 +1447,8 @@
   });
 
   document.getElementById('btn-fix-something').addEventListener('click', function () {
-    resetChat();
     showScreen('chat');
+    addClaudeMessage("No problem — what would you like to add or change?");
   });
 
   /* ── Navigate API call ── */
