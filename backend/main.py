@@ -54,7 +54,7 @@ EMERGENCY_KEYWORDS = {
     "face drooping", "arm weakness", "slurred speech", "stroke",
     "unconscious", "unresponsive", "passed out", "fainted",
     "seizure", "convulsing",
-    "overdose", "od",
+    "overdose",
     "throat closing", "anaphylaxis", "epipen",
     "purple spots", "meningitis",
     "severe bleeding", "bleeding won't stop", "coughing blood",
@@ -167,9 +167,13 @@ app.add_middleware(
 
 
 def _contains_emergency_keyword(text: str) -> bool:
-    """Return True if text contains any emergency keyword (case-insensitive)."""
+    """Return True if text contains any emergency keyword as a whole phrase (case-insensitive)."""
     lower = text.lower()
-    return any(kw in lower for kw in EMERGENCY_KEYWORDS)
+    for kw in EMERGENCY_KEYWORDS:
+        # Use word boundaries so "od" can't match inside "body", etc.
+        if re.search(r'\b' + re.escape(kw) + r'\b', lower):
+            return True
+    return False
 
 
 def _any_message_emergency(messages: list) -> bool:
